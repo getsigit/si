@@ -1,7 +1,7 @@
 use {
     crate::{cli::PrCommand, context::Ctx, git, ui},
     anyhow::{anyhow, Result},
-    sigit_api::State,
+    sigit_si_api::State,
 };
 
 pub async fn run(ctx: &Ctx, command: PrCommand) -> Result<()> {

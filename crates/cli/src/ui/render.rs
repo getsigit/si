@@ -3,7 +3,7 @@
 
 use {
     super::{bold, dim, highlight, relative_time, state_badge},
-    sigit_api::models::{
+    sigit_si_api::models::{
         Billing, CloudSession, CodeHit, Comment, Hook, Issue, IssueSummary, PullRequest,
         PullRequestSummary, Repository, RepositorySummary, User,
     },

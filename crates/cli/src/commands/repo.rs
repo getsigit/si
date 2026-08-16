@@ -5,7 +5,7 @@ use {
         ui::{self, prompt},
     },
     anyhow::Result,
-    sigit_api::NewRepository,
+    sigit_si_api::NewRepository,
 };
 
 pub async fn run(ctx: &Ctx, command: RepoCommand) -> Result<()> {

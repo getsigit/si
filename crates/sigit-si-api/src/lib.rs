@@ -1,9 +1,9 @@
 //! A typed client for the [sigit.si](https://sigit.si) JSON API.
 //!
 //! ```no_run
-//! use sigit_api::{Client, Environment, issues::State};
+//! use sigit_si_api::{Client, Environment, issues::State};
 //!
-//! # async fn example() -> sigit_api::Result<()> {
+//! # async fn example() -> sigit_si_api::Result<()> {
 //! let client = Client::new(Environment::Production)?.with_token("…");
 //!
 //! let me = client.user().await?;

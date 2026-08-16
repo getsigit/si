@@ -1,7 +1,7 @@
 use {
     crate::{cli::IssueCommand, context::Ctx, ui},
     anyhow::{anyhow, Result},
-    sigit_api::State,
+    sigit_si_api::State,
 };
 
 pub async fn run(ctx: &Ctx, command: IssueCommand) -> Result<()> {

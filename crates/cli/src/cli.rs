@@ -1,6 +1,6 @@
 //! The `si` command tree.
 
-use {clap::Parser, sigit_api::Environment, std::str::FromStr};
+use {clap::Parser, sigit_si_api::Environment, std::str::FromStr};
 
 #[derive(Parser)]
 #[command(name = "si", version, about = "The sigit.si command line interface.")]

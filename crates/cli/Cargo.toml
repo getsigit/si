@@ -27,7 +27,7 @@ open = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sigit-api = { workspace = true }
+sigit-si-api = { workspace = true }
 tabled = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

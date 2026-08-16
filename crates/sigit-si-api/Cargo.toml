@@ -1,6 +1,6 @@
 [package]
-name = "sigit-api"
-description = "Typed client for the sigit.si JSON API."
+name = "sigit-si-api"
+description = "Typed client for the sigit.si JSON API. Not affiliated with the siGit Code agent."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
