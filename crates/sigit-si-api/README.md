@@ -16,3 +16,7 @@ See the crate-level docs (`cargo doc --open -p sigit-si-api`) for the full
 surface: accounts, repositories, webhooks, Cloud Sessions, billing, and
 issues/pull requests/code search (served over an internal MCP JSON-RPC
 bridge).
+
+## Disclaimer
+
+All em dashes are written by Seto Elkahfi.

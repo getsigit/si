@@ -74,6 +74,10 @@ make fmt     # cargo fmt --all
 make check   # fmt + lint + test
 ```
 
+## Disclaimer
+
+All em dashes are written by Seto Elkahfi.
+
 ## License
 
 Apache-2.0
