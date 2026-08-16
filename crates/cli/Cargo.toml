@@ -1,0 +1,37 @@
+[package]
+name = "sigit-si-cli"
+description = "si — the sigit.si command line interface."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["sigit", "git", "cli", "code-review"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "../../README.md"
+
+[[bin]]
+name = "si"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+console = { workspace = true }
+dialoguer = { workspace = true }
+dirs = { workspace = true }
+git2 = { workspace = true }
+open = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sigit-api = { workspace = true }
+tabled = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

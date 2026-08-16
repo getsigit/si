@@ -1,0 +1,9 @@
+/target
+*.log
+
+# Editor
+.zed
+.vscode
+
+# Secrets
+.env

@@ -1,0 +1,20 @@
+[package]
+name = "sigit-api"
+description = "Typed client for the sigit.si JSON API."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["sigit", "git", "api", "client"]
+categories = ["api-bindings"]
+readme = "README.md"
+
+[dependencies]
+chrono = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
