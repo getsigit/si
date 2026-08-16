@@ -4,7 +4,7 @@
 use {
     crate::git::{self, RepoSlug},
     anyhow::{anyhow, Result},
-    sigit_api::{Client, Environment},
+    sigit_si_api::{Client, Environment},
 };
 
 pub struct Ctx {

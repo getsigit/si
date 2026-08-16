@@ -53,15 +53,15 @@ CI authenticates without an interactive login.
 
 ## Workspace layout
 
-- **`crates/sigit-api`** — a standalone, typed Rust client for the sigit.si
+- **`crates/sigit-si-api`** — a standalone, typed Rust client for the sigit.si
   JSON API. No CLI dependencies (clap, dialoguer, …); usable from any Rust
   project that wants to talk to sigit.si, including the desktop app.
 - **`crates/cli`** — the `si` binary: command parsing, terminal rendering, git
-  remote resolution, and credential storage, built on top of `sigit-api`.
+  remote resolution, and credential storage, built on top of `sigit-si-api`.
 
 Issues, pull requests, and code search have no REST surface on sigit.si yet —
 they're served over the same MCP (Model Context Protocol) JSON-RPC endpoint
-the AI agent uses. `sigit-api` speaks that transport internally; it's not
+the AI agent uses. `sigit-si-api` speaks that transport internally; it's not
 visible at the call site.
 
 ## Development

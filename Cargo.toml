@@ -1,17 +1,17 @@
 [workspace]
 resolver = "2"
-members = ["crates/cli", "crates/sigit-api"]
+members = ["crates/cli", "crates/sigit-si-api"]
 
-# The workspace exists for one reason: `sigit-api` is a standalone, typed
-# client for the sigit.si JSON API that the desktop app (sigit-app) and the
-# agent (sigit) can depend on without pulling in clap, dialoguer, and the rest
-# of the terminal surface. `cli` is the thin `si` binary on top of it.
+# The workspace exists for one reason: `sigit-si-api` is a standalone, typed
+# client for the sigit.si JSON API that the desktop app (sigit-app) can depend
+# on without pulling in clap, dialoguer, and the rest of the terminal surface.
+# `cli` is the thin `si` binary on top of it.
 [workspace.package]
 version = "1.0.0"
 edition = "2021"
 authors = ["Seto Elkahfi <seto@sigit.si>"]
 license = "Apache-2.0"
-repository = "https://github.com/getsigit/sigit-si-cli"
+repository = "https://github.com/getsigit/si"
 homepage = "https://sigit.si"
 
 [workspace.dependencies]
@@ -29,7 +29,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sigit-api = { version = "1.0.0", path = "crates/sigit-api" }
+sigit-si-api = { version = "1.0.0", path = "crates/sigit-si-api" }
 tabled = { version = "0.20", default-features = false, features = ["std"] }
 thiserror = "2.0"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

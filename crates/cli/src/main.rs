@@ -11,7 +11,7 @@ use {
     cli::{Cli, Command},
     console::style,
     context::Ctx,
-    sigit_api::Client,
+    sigit_si_api::Client,
 };
 
 #[tokio::main]

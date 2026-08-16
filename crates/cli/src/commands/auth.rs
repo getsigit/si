@@ -1,7 +1,7 @@
 use {
     crate::{cli::AuthCommand, config, context::Ctx, ui},
     anyhow::{anyhow, Result},
-    sigit_api::{account::incomplete_reason, models::AccountStatus},
+    sigit_si_api::{account::incomplete_reason, models::AccountStatus},
 };
 
 pub async fn run(ctx: &Ctx, command: AuthCommand) -> Result<()> {

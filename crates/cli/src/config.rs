@@ -6,7 +6,7 @@
 
 use {
     anyhow::{anyhow, Context, Result},
-    sigit_api::Environment,
+    sigit_si_api::Environment,
     std::{
         fs,
         path::{Path, PathBuf},
