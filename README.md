@@ -94,6 +94,17 @@ they're served over the same MCP (Model Context Protocol) JSON-RPC endpoint
 the AI agent uses. `sigit-si-api` speaks that transport internally; it's not
 visible at the call site.
 
+## MCP Registry listing
+
+The sigit.si MCP server (the same endpoint `sigit-si-api` talks to, and the
+official MCP server the siGit Code CLI bakes in) is published to the
+[official MCP Registry](https://registry.modelcontextprotocol.io) as
+**`si.sigit/sigit`**, a remote Streamable-HTTP listing, so registry-aware
+clients can add it in one click. `server.json` at the repo root and the
+`release-mcp-registry.yml` workflow own that listing; namespace ownership is
+proven by a DNS TXT record on `sigit.si`. The internal setup and release
+runbook live with the server (private `sigit-si` repo).
+
 ## Development
 
 ```sh
