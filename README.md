@@ -40,6 +40,36 @@ si api repos                       # raw escape hatch for any endpoint
 
 Pass `--json` to any read command for machine-readable output.
 
+### As an MCP server
+
+`si mcp` serves these same commands to an AI agent as
+[MCP](https://modelcontextprotocol.io) tools over stdio:
+
+```jsonc
+{
+  "mcpServers": {
+    "sigit": { "command": "si", "args": ["mcp"] }
+  }
+}
+```
+
+There is nothing to authenticate — the server reuses the token `si auth login`
+stored. Point your editor at the directory of a checkout and repository tools
+default to the repo you're standing in, so the agent can say "list the open
+pull requests" without naming one; `create_pull_request` likewise defaults its
+head to the checked-out branch.
+
+Trim the tool list when an agent doesn't need all of it:
+
+```sh
+si mcp --read-only                    # drop every tool that writes
+si mcp --toolsets repo,issue,pr,code  # or SIGIT_TOOLSETS=repo,issue
+```
+
+Toolsets are `account`, `repo`, `issue`, `pr`, `code`, `hook`, `session`, and
+`billing`. sigit.si also hosts a remote MCP server at `/api/v1/mcp` for clients
+that would rather connect over HTTP than spawn a binary.
+
 ### Environments
 
 ```sh
