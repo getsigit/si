@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod context;
 mod git;
+mod mcp;
 mod ui;
 
 use {
@@ -49,5 +50,8 @@ async fn run() -> Result<()> {
         Command::Billing(command) => commands::billing::run(&ctx, command).await,
         Command::Browse(args) => commands::browse::run(&ctx, args).await,
         Command::Api(args) => commands::api::run(&ctx, args).await,
+        // Takes `ctx` by value: the server outlives the dispatch, serving
+        // tools over stdio until the client hangs up.
+        Command::Mcp(args) => mcp::run(ctx, args).await,
     }
 }

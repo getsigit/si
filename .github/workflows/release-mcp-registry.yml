@@ -1,0 +1,192 @@
+name: MCP Registry Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      hosted_version:
+        description: "Override the version in the hosted listing (e.g. 1.2.6); leave blank to publish it as-is"
+        required: false
+      skip_cli:
+        description: "Publish only the hosted server, leaving the CLI listing alone"
+        type: boolean
+        default: false
+      skip_hosted:
+        description: "Publish only the CLI, leaving the hosted listing alone"
+        type: boolean
+        default: false
+
+# This repo owns two MCP Registry entries, one file each:
+#
+#   server.json         si.sigit/cli    this CLI, a cargo package run as `si mcp`
+#   server-sigit.json   si.sigit/sigit  the hosted server at sigit.si/api/v1/mcp
+#
+# The CLI is what this repo actually ships, so it holds the conventional
+# filename that `mcp-publisher` defaults to.
+#
+# Both sit under one namespace, so one credential covers them. A domain
+# namespace proves ownership through DNS, not GitHub OIDC: the registry checks
+# a v=MCPv1 TXT record on sigit.si against a request signed with the matching
+# Ed25519 private key. See the MCP Registry doc in the sigit-si repo for the
+# one-time key/DNS setup.
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish the MCP Registry listings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Take the CLI listing's version from Cargo.toml
+        if: ${{ !inputs.skip_cli }}
+        shell: bash
+        run: |
+          # The workspace manifest is the single source of truth: the listing
+          # names a crates.io version, so a hand-edited number here could point
+          # at a release that doesn't exist.
+          crate_version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+          if [ -z "${crate_version}" ]; then
+            echo "Could not read the workspace version from Cargo.toml." >&2
+            exit 1
+          fi
+          echo "CRATE_VERSION=${crate_version}" >> "$GITHUB_ENV"
+
+          jq --arg v "${crate_version}" \
+            '.version = $v | .packages |= map(.version = $v)' \
+            server.json > server.tmp
+          mv server.tmp server.json
+          cat server.json
+
+      - name: Verify the published crate carries the ownership marker
+        if: ${{ !inputs.skip_cli }}
+        shell: bash
+        run: |
+          # The registry stores metadata only, and validates a package listing
+          # by fetching the package and looking for a marker naming the server.
+          # Checking the working tree isn't enough: a version published before
+          # the marker landed will never carry it, and crates.io versions are
+          # immutable. The comparison is case-sensitive.
+          server_name="$(jq -r '.name' server.json)"
+          crate="$(jq -r '.packages[0].identifier' server.json)"
+
+          for attempt in $(seq 1 20); do
+            if curl -fsSL -H "User-Agent: getsigit/si release-workflow" \
+                 "https://crates.io/api/v1/crates/${crate}/${CRATE_VERSION}" >/dev/null; then
+              echo "${crate} ${CRATE_VERSION} is indexed on crates.io."
+              break
+            fi
+            if [ "${attempt}" -eq 20 ]; then
+              echo "${crate} ${CRATE_VERSION} is still not on crates.io after 10 minutes." >&2
+              echo "Publish the crate first: the listing can only name a version that exists." >&2
+              exit 1
+            fi
+            echo "Waiting for crates.io to index ${crate} ${CRATE_VERSION} (attempt ${attempt}/20)..."
+            sleep 30
+          done
+
+          curl -fsSL -H "User-Agent: getsigit/si release-workflow" -o package.crate \
+            "https://crates.io/api/v1/crates/${crate}/${CRATE_VERSION}/download"
+          # `readme` in crates/cli/Cargo.toml points at the repo-root README,
+          # which cargo copies to the crate root when packaging.
+          if ! tar -xOzf package.crate "${crate}-${CRATE_VERSION}/README.md" | grep -q "mcp-name: ${server_name}"; then
+            echo "${crate} ${CRATE_VERSION} README is missing the 'mcp-name: ${server_name}' marker." >&2
+            echo "crates.io versions are immutable — cut a new release with the marker in place." >&2
+            exit 1
+          fi
+          rm package.crate
+
+      - name: Optionally override the version in the hosted listing
+        if: ${{ !inputs.skip_hosted }}
+        shell: bash
+        run: |
+          version="${{ inputs.hosted_version }}"
+          if [ -n "${version}" ]; then
+            jq --arg v "${version}" '.version = $v' server-sigit.json > server-sigit.tmp
+            mv server-sigit.tmp server-sigit.json
+          fi
+          cat server-sigit.json
+
+      - name: Check the hosted remote URL matches the namespace domain
+        if: ${{ !inputs.skip_hosted }}
+        shell: bash
+        run: |
+          # The registry rejects a remote server whose URL isn't under the
+          # namespace's domain. si.sigit -> sigit.si, so every listed remote
+          # must live on sigit.si (or a subdomain).
+          server_name="$(jq -r '.name' server-sigit.json)"
+          domain="$(echo "${server_name%%/*}" | awk -F. '{ for (i=NF; i>=1; i--) printf "%s%s", $i, (i>1 ? "." : "") }')"
+          echo "Server: ${server_name}  Domain: ${domain}"
+
+          bad="$(jq -r --arg d "${domain}" '
+            .remotes // []
+            | map(.url | sub("^[a-z]+://"; "") | sub("/.*$"; ""))
+            | map(select(. != $d and (endswith("." + $d) | not)))
+            | .[]' server-sigit.json)"
+          if [ -n "${bad}" ]; then
+            echo "Remote URL host(s) not under ${domain}: ${bad}" >&2
+            exit 1
+          fi
+
+      - name: Install mcp-publisher
+        shell: bash
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to the MCP Registry
+        shell: bash
+        env:
+          MCP_REGISTRY_DNS_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_DNS_PRIVATE_KEY }}
+        run: |
+          if [ -z "${MCP_REGISTRY_DNS_PRIVATE_KEY}" ]; then
+            echo "MCP_REGISTRY_DNS_PRIVATE_KEY secret is not set. See the MCP Registry doc in the sigit-si repo." >&2
+            exit 1
+          fi
+          ./mcp-publisher login dns --domain=sigit.si --private-key="${MCP_REGISTRY_DNS_PRIVATE_KEY}"
+
+      - name: Publish
+        shell: bash
+        run: |
+          # Republishing a version that is already up is not worth failing the
+          # run over: the other listing may still need to go out.
+          publish_or_skip() {
+            local out
+            out="$(./mcp-publisher publish "$1" 2>&1)" && { echo "${out}"; return 0; }
+            echo "${out}"
+            if echo "${out}" | grep -q "duplicate version"; then
+              echo "$1 is already published at this version — skipping."
+              return 0
+            fi
+            return 1
+          }
+
+          published=0
+          if [ "${{ inputs.skip_cli }}" != "true" ]; then
+            publish_or_skip server.json
+            published=1
+          fi
+          if [ "${{ inputs.skip_hosted }}" != "true" ]; then
+            publish_or_skip server-sigit.json
+            published=1
+          fi
+          if [ "${published}" -eq 0 ]; then
+            echo "Both listings were skipped, so there was nothing to publish." >&2
+            exit 1
+          fi
+
+      - name: Verify the servers are listed
+        shell: bash
+        run: |
+          if [ "${{ inputs.skip_cli }}" != "true" ]; then
+            files="server.json"
+          fi
+          if [ "${{ inputs.skip_hosted }}" != "true" ]; then
+            files="${files} server-sigit.json"
+          fi
+
+          for file in ${files}; do
+            server_name="$(jq -r '.name' "${file}")"
+            echo "== ${server_name} (${file}) =="
+            curl -fsSL "https://registry.modelcontextprotocol.io/v0.1/servers?search=${server_name}" | jq .
+          done
