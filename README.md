@@ -42,6 +42,8 @@ Pass `--json` to any read command for machine-readable output.
 
 ### As an MCP server
 
+<!-- mcp-name: si.sigit/cli -->
+
 `si mcp` serves these same commands to an AI agent as
 [MCP](https://modelcontextprotocol.io) tools over stdio:
 
@@ -94,16 +96,30 @@ they're served over the same MCP (Model Context Protocol) JSON-RPC endpoint
 the AI agent uses. `sigit-si-api` speaks that transport internally; it's not
 visible at the call site.
 
-## MCP Registry listing
+## MCP Registry listings
 
-The sigit.si MCP server (the same endpoint `sigit-si-api` talks to, and the
-official MCP server the siGit Code CLI bakes in) is published to the
-[official MCP Registry](https://registry.modelcontextprotocol.io) as
-**`si.sigit/sigit`**, a remote Streamable-HTTP listing, so registry-aware
-clients can add it in one click. `server.json` at the repo root and the
-`release-mcp-registry.yml` workflow own that listing; namespace ownership is
-proven by a DNS TXT record on `sigit.si`. The internal setup and release
-runbook live with the server (private `sigit-si` repo).
+This repo publishes two entries to the
+[official MCP Registry](https://registry.modelcontextprotocol.io), one per way
+of reaching the same tools, so registry-aware clients can add either in one
+click:
+
+| Listing | File | What it is |
+| --- | --- | --- |
+| `si.sigit/cli` | `server.json` | This CLI: a cargo package listing that runs `si mcp` over stdio. |
+| `si.sigit/sigit` | `server-sigit.json` | The hosted server at `sigit.si/api/v1/mcp`, a remote Streamable-HTTP listing. The endpoint `sigit-si-api` talks to, and the official server siGit Code bakes in. |
+
+The CLI holds `server.json` because it's what this repo ships, and that's the
+filename `mcp-publisher` defaults to. Sibling listings are named after their
+own leaf, so the file says which entry it publishes.
+
+Both go out through the `release-mcp-registry.yml` workflow, and both prove
+namespace ownership with a DNS TXT record on `sigit.si` rather than GitHub
+OIDC, so one credential covers the pair. A package listing has a second hurdle:
+the registry fetches the crate from crates.io and looks for the
+`mcp-name: si.sigit/cli` marker in its README, which is why that marker sits in
+this file. Crate versions are immutable, so a release that ships without the
+marker can never be listed, and fixing it costs a new version. The internal
+setup and release runbook live with the server (private `sigit-si` repo).
 
 ## Development
 
