@@ -7,7 +7,7 @@ members = ["crates/cli", "crates/sigit-si-api"]
 # on without pulling in clap, dialoguer, and the rest of the terminal surface.
 # `cli` is the thin `si` binary on top of it.
 [workspace.package]
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["Seto Elkahfi <seto@sigit.si>"]
 license = "Apache-2.0"
@@ -27,12 +27,20 @@ reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls-native-roots",
 ] }
+rmcp = { version = "3.2", features = [
+    "server",
+    "macros",
+    "transport-io",
+    "schemars",
+] }
+schemars = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sigit-si-api = { version = "1.0.0", path = "crates/sigit-si-api" }
+sigit-si-api = { version = "1.1.0", path = "crates/sigit-si-api" }
 tabled = { version = "0.20", default-features = false, features = ["std"] }
 thiserror = "2.0"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+# `io-std` is what the MCP stdio transport binds to.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

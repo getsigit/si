@@ -104,7 +104,7 @@ pub struct CloudMessage {
 }
 
 /// `POST /api/v1/sessions/:id/messages`
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppendedMessage {
     pub session: CloudSession,
     pub message: CloudMessage,

@@ -60,6 +60,9 @@ pub enum Command {
     /// Call the sigit.si API directly. The escape hatch for anything without
     /// a dedicated command.
     Api(ApiArgs),
+
+    /// Serve these commands to an AI agent as MCP tools over stdio.
+    Mcp(McpArgs),
 }
 
 #[derive(clap::Subcommand)]
@@ -254,6 +257,18 @@ pub struct BrowseArgs {
     /// What to open: a repo, "OWNER/NAME/pull/N", "OWNER/NAME/issue/N", or
     /// left blank for the current repository.
     pub target: Option<String>,
+}
+
+#[derive(clap::Args)]
+pub struct McpArgs {
+    /// Drop every tool that writes, leaving only the ones that read.
+    #[arg(long)]
+    pub read_only: bool,
+
+    /// Expose only these tool groups, comma-separated. Defaults to all of
+    /// them: account, repo, issue, pr, code, hook, session, billing.
+    #[arg(long, value_delimiter = ',', env = "SIGIT_TOOLSETS")]
+    pub toolsets: Vec<String>,
 }
 
 #[derive(clap::Args)]

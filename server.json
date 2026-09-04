@@ -1,18 +1,59 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "si.sigit/sigit",
-  "title": "siGit",
-  "description": "MCP server for siGit (sigit.si): browse repos, search code, manage PRs/issues, web search.",
-  "version": "1.2.5",
-  "websiteUrl": "https://sigit.si",
+  "name": "si.sigit/cli",
+  "title": "siGit CLI",
+  "description": "Run sigit.si locally: browse repos, search code, manage PRs, issues, and Cloud Sessions.",
+  "version": "1.1.0",
+  "websiteUrl": "https://github.com/getsigit/si",
   "repository": {
     "url": "https://github.com/getsigit/si",
     "source": "github"
   },
-  "remotes": [
+  "packages": [
     {
-      "type": "streamable-http",
-      "url": "https://sigit.si/api/v1/mcp"
+      "registryType": "cargo",
+      "registryBaseUrl": "https://crates.io",
+      "identifier": "sigit-si-cli",
+      "version": "1.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp",
+          "valueHint": "mcp",
+          "description": "Serve the CLI's commands as MCP tools over stdio instead of running one of them.",
+          "isRequired": true
+        },
+        {
+          "type": "named",
+          "name": "--read-only",
+          "description": "Drop every tool that writes, leaving only the ones that read.",
+          "isRequired": false
+        },
+        {
+          "type": "named",
+          "name": "--toolsets",
+          "description": "Comma-separated groups to expose, out of account, repo, issue, pr, code, hook, session, and billing. Defaults to all of them.",
+          "isRequired": false
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "SIGIT_TOKEN",
+          "description": "sigit.si session token. Optional: the server otherwise reuses whatever `si auth login` stored.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "SIGIT_TOOLSETS",
+          "description": "The environment form of --toolsets, for clients that pass configuration as variables rather than arguments.",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
     }
   ],
   "_meta": {
@@ -21,13 +62,13 @@
       "keywords": [
         "git",
         "git hosting",
+        "cli",
         "mcp server",
         "model context protocol",
         "code search",
         "pull requests",
         "issues",
         "repositories",
-        "web search",
         "coding agent",
         "ai coding agent",
         "ai agent tools",
