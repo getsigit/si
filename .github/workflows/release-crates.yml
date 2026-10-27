@@ -1,0 +1,64 @@
+name: Publish to crates.io
+
+on:
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: "Crate to publish. The CLI depends on the API crate, so publish sigit-si-api first."
+        type: choice
+        options:
+          - sigit-si-api
+          - sigit-si-cli
+        required: true
+      dry_run:
+        description: "Package and verify without uploading"
+        type: boolean
+        default: false
+
+# Publishing uses crates.io Trusted Publishing: the job trades its GitHub OIDC
+# token for a short-lived crates.io token, so no long-lived API token is stored
+# in the repository. Each crate needs a Trusted Publisher entry in its
+# crates.io settings pointing at this repository and the workflow file
+# `release-crates.yml`.
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish ${{ inputs.crate }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Rust toolchain
+        shell: bash
+        run: |
+          rust_toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml | head -n 1)"
+          echo "RUST_TOOLCHAIN=${rust_toolchain}" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test
+        run: cargo test -p ${{ inputs.crate }}
+
+      - name: Dry run
+        if: ${{ inputs.dry_run }}
+        run: cargo publish -p ${{ inputs.crate }} --dry-run
+
+      - name: Get a crates.io token
+        if: ${{ !inputs.dry_run }}
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish
+        if: ${{ !inputs.dry_run }}
+        run: cargo publish -p ${{ inputs.crate }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
