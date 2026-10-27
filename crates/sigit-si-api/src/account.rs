@@ -5,6 +5,7 @@ use crate::{
     error::Result,
     models::{AccountStatus, User},
 };
+use reqwest::Method;
 
 impl Client {
     /// `POST /api/v1/auth/sign_in`
@@ -22,6 +23,34 @@ impl Client {
     /// `DELETE /api/v1/auth/sign_out` — revokes the token server-side.
     pub async fn sign_out(&self) -> Result<()> {
         self.delete("auth/sign_out").await
+    }
+
+    /// `POST /api/v1/auth/sign_up` — creates an account and sends the
+    /// confirmation email. The answer is the sign-up result as the server sent
+    /// it (`code`, `message`, `data`), so it is returned untyped.
+    pub async fn sign_up(&self, email: &str, password: &str) -> Result<serde_json::Value> {
+        let body = serde_json::json!({
+            "email": email.trim().to_ascii_lowercase(),
+            "password": password,
+        });
+        self.post("auth/sign_up", &body).await
+    }
+
+    /// `POST /api/v1/auth/confirmation/resend` — sends the confirmation email
+    /// again. The server answers the same way whether or not the address has an
+    /// account.
+    pub async fn resend_confirmation(&self, email: &str) -> Result<()> {
+        let body = serde_json::json!({ "email": email.trim().to_ascii_lowercase() });
+        self.send_empty(
+            self.request(Method::POST, "auth/confirmation/resend")
+                .json(&body),
+        )
+        .await
+    }
+
+    /// `DELETE /api/v1/me` — permanently deletes the signed-in account.
+    pub async fn delete_account(&self) -> Result<()> {
+        self.delete("me").await
     }
 
     /// `GET /api/v1/user` — the signed-in user's profile.

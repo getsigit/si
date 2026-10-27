@@ -23,10 +23,10 @@ pub struct User {
     pub created_at: DateTime<Utc>,
 }
 
-/// The result of `POST /api/v1/auth/sign_in`, matching the desktop app's
-/// `AccountStatus` enum: the bare string `"NotFound"`, `{"Ready":{…}}`, or
+/// The result of `POST /api/v1/auth/sign_in`, shaped as an
+/// externally tagged enum: the bare string `"NotFound"`, `{"Ready":{…}}`, or
 /// `{"Incomplete":{…}}`.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum AccountStatus {
     NotFound,
     Ready { access_token: String },
@@ -124,7 +124,7 @@ pub struct Billing {
 }
 
 /// `POST /api/v1/billing/checkout`, `POST /api/v1/billing/portal`
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BillingUrl {
     pub url: String,
 }
@@ -132,7 +132,7 @@ pub struct BillingUrl {
 // ── Git credentials ─────────────────────────────────────────────────────────
 
 /// `POST /api/v1/git_credentials` — a short-lived, read-scoped git password.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GitCredential {
     pub git_token: String,
     pub username: String,

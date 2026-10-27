@@ -13,8 +13,19 @@ readme = "README.md"
 
 [dependencies]
 chrono = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
+thiserror = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+
+[features]
+default = ["client", "rustls-tls-native-roots"]
+# The HTTP client and endpoint modules. Without it the crate is just the wire
+# types (`models`, `ErrorResponse`, `error::codes`, `Environment`, `CLIENT_HEADER`).
+client = ["dep:reqwest", "dep:thiserror", "dep:tracing"]
+# TLS backend for the client the crate builds itself. Pick one, or disable them
+# all and inject a `reqwest::Client` through `Client::builder`.
+rustls-tls-native-roots = ["client", "reqwest/rustls-tls-native-roots"]
+rustls-tls-webpki-roots = ["client", "reqwest/rustls-tls-webpki-roots"]
+native-tls = ["client", "reqwest/native-tls"]

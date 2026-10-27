@@ -50,7 +50,7 @@ impl Environment {
         }
     }
 
-    fn default_scheme(&self) -> &'static str {
+    pub(crate) fn default_scheme(&self) -> &'static str {
         match self {
             Environment::Dev => "http",
             Environment::Production => "https",
@@ -59,7 +59,7 @@ impl Environment {
 }
 
 /// Accept `SIGIT_HOST` with or without a scheme, and strip any trailing slash.
-fn normalize_host(host: &str, default_scheme: &str) -> String {
+pub(crate) fn normalize_host(host: &str, default_scheme: &str) -> String {
     let with_scheme = if host.contains("://") {
         host.to_string()
     } else {
