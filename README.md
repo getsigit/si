@@ -87,7 +87,7 @@ CI authenticates without an interactive login.
 
 - **`crates/sigit-si-api`** — a standalone, typed Rust client for the sigit.si
   JSON API. No CLI dependencies (clap, dialoguer, …); usable from any Rust
-  project that wants to talk to sigit.si, including the desktop app.
+  project that wants to talk to sigit.si.
 - **`crates/cli`** — the `si` binary: command parsing, terminal rendering, git
   remote resolution, and credential storage, built on top of `sigit-si-api`.
 

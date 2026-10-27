@@ -2,7 +2,7 @@
 
 A typed Rust client for the [sigit.si](https://sigit.si) JSON API. Used by the
 `si` CLI (`crates/cli` in this workspace) and usable standalone by any Rust
-project — the desktop app included.
+project.
 
 ```rust
 use sigit_si_api::{Client, Environment};
