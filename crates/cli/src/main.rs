@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod config;
 mod context;
+mod credential;
 mod git;
 mod mcp;
 mod ui;

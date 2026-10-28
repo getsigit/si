@@ -76,6 +76,22 @@ pub enum AuthCommand {
     Logout,
     /// Show who is currently signed in.
     Status,
+    /// Let git use your sigit.si sign-in for clones and fetches, by adding a
+    /// credential helper to your global git config.
+    SetupGit,
+    /// Git's credential helper protocol. Git runs this; you don't need to.
+    #[command(hide = true)]
+    GitCredential {
+        #[arg(value_enum)]
+        operation: GitCredentialOperation,
+    },
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+pub enum GitCredentialOperation {
+    Get,
+    Store,
+    Erase,
 }
 
 #[derive(clap::Subcommand)]
@@ -107,6 +123,17 @@ pub enum RepoCommand {
     },
     /// Open a repository in your browser.
     Browse { repo: Option<String> },
+    /// Clone a repository with git, signing in through `si` so the token
+    /// never lands in the URL or on disk.
+    Clone {
+        /// OWNER/NAME.
+        repo: String,
+        /// Directory to clone into.
+        dir: Option<String>,
+        /// Extra arguments for `git clone`, after `--`.
+        #[arg(last = true)]
+        git_args: Vec<String>,
+    },
 }
 
 #[derive(clap::Subcommand)]

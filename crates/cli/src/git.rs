@@ -133,7 +133,7 @@ fn split_host_and_path(url: &str) -> Option<(String, String)> {
 
 /// Compare hosts ignoring the port and a leading `www.`, so a dev remote on
 /// `localhost:3000` matches a `localhost` base URL and vice versa.
-fn hosts_match(a: &str, b: &str) -> bool {
+pub fn hosts_match(a: &str, b: &str) -> bool {
     fn normalize(host: &str) -> String {
         let host = host.trim().to_ascii_lowercase();
         let host = host

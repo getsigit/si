@@ -1,7 +1,13 @@
 use {
-    crate::{cli::AuthCommand, config, context::Ctx, ui},
-    anyhow::{anyhow, Result},
+    crate::{
+        cli::{AuthCommand, GitCredentialOperation},
+        config,
+        context::Ctx,
+        credential, ui,
+    },
+    anyhow::{anyhow, Context, Result},
     sigit_si_api::{account::incomplete_reason, models::AccountStatus},
+    std::io::{self, Write},
 };
 
 pub async fn run(ctx: &Ctx, command: AuthCommand) -> Result<()> {
@@ -9,7 +15,40 @@ pub async fn run(ctx: &Ctx, command: AuthCommand) -> Result<()> {
         AuthCommand::Login { email } => login(ctx, email).await,
         AuthCommand::Logout => logout(ctx).await,
         AuthCommand::Status => status(ctx).await,
+        AuthCommand::SetupGit => setup_git(ctx),
+        AuthCommand::GitCredential { operation } => git_credential(ctx, operation).await,
     }
+}
+
+fn setup_git(ctx: &Ctx) -> Result<()> {
+    let exe = std::env::current_exe().context("Could not locate the `si` executable.")?;
+    let base_url = ctx.client.base_url();
+    credential::setup_global_helper(base_url, &exe)?;
+    ui::success(format!(
+        "Git will now sign in to {} through `si`.",
+        ui::highlight(base_url)
+    ));
+    Ok(())
+}
+
+/// Answer git's credential protocol. `store` and `erase` do nothing, since the
+/// password is minted on demand and never kept. Anything this helper can't
+/// answer for stays silent so git moves on to the next helper.
+async fn git_credential(ctx: &Ctx, operation: GitCredentialOperation) -> Result<()> {
+    if !matches!(operation, GitCredentialOperation::Get) {
+        return Ok(());
+    }
+
+    let request = credential::parse_request(io::stdin().lock());
+    if ctx.client.token().is_none() || !credential::is_for_host(&request, ctx.client.base_url()) {
+        return Ok(());
+    }
+
+    let minted = ctx.client.git_credential().await?;
+    let mut stdout = io::stdout().lock();
+    stdout.write_all(credential::response(&minted.username, &minted.git_token).as_bytes())?;
+    stdout.flush()?;
+    Ok(())
 }
 
 async fn login(ctx: &Ctx, email: Option<String>) -> Result<()> {
