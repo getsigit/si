@@ -18,6 +18,8 @@ This installs a binary named `si`.
 si auth login                     # sign in with your sigit.si account
 si repo list                      # your repositories
 si repo create my-project --private
+si repo clone seto/my-project      # clone with your sign-in, no token in the URL
+si auth setup-git                  # or let plain `git clone` use it too
 
 # Inside a repo checkout, si infers OWNER/NAME from the sigit.si git remote —
 # --repo is only needed when you're not standing in one.
@@ -31,8 +33,21 @@ si issue create --title "Bug: ..." --body "Steps to reproduce..."
 si code search "TODO" --ref main
 si code view README.md
 
+si status set HEAD --state success --context ci/test
+si status view                     # the checks on HEAD
+
+si run start --repo seto/app "Fix the failing build"
+si run list
+si run view 12                     # status and the end of the transcript
+
+si site publish --wait             # publish the default branch as a site
+si site view
+
 si session new --title "Refactor auth"
+si models
 si billing show
+
+si auth signup                     # also: resend, reset-password, delete-account
 
 si browse                          # open the current repo on sigit.si
 si api repos                       # raw escape hatch for any endpoint
