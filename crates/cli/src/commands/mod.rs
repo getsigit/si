@@ -9,3 +9,4 @@ pub mod me;
 pub mod pr;
 pub mod repo;
 pub mod session;
+pub mod status;

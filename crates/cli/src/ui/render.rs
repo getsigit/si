@@ -3,9 +3,10 @@
 
 use {
     super::{bold, dim, highlight, relative_time, state_badge},
+    console::style,
     sigit_si_api::models::{
-        Billing, CloudSession, CodeHit, Comment, Hook, Issue, IssueSummary, PullRequest,
-        PullRequestSummary, Repository, RepositorySummary, User,
+        Billing, CloudSession, CodeHit, CombinedStatus, Comment, Hook, Issue, IssueSummary,
+        PullRequest, PullRequestSummary, Repository, RepositorySummary, User,
     },
     tabled::{builder::Builder, settings::Style},
 };
@@ -358,6 +359,46 @@ pub fn session_detail(session: &CloudSession) {
         }
         println!();
     }
+}
+
+// ── Commit statuses ─────────────────────────────────────────────────────────
+
+fn status_badge(state: &str) -> String {
+    match state {
+        "success" => style("success").green().to_string(),
+        "failure" | "error" => style(state).red().to_string(),
+        "pending" => style("pending").yellow().to_string(),
+        other => style(other).dim().to_string(),
+    }
+}
+
+pub fn combined_status(combined: &CombinedStatus) {
+    println!();
+    println!(
+        "  {}  {}",
+        highlight(&combined.sha[..combined.sha.len().min(12)]),
+        status_badge(&combined.state)
+    );
+    println!();
+
+    let rows = combined
+        .statuses
+        .iter()
+        .map(|status| {
+            vec![
+                status.context.clone(),
+                status_badge(&status.state),
+                truncate(status.description.as_deref().unwrap_or("—"), 48),
+                relative_time(status.updated_at),
+            ]
+        })
+        .collect();
+
+    table(
+        &["Check", "State", "Description", "Updated"],
+        rows,
+        "No statuses have been reported on this commit.",
+    );
 }
 
 // ── Billing ─────────────────────────────────────────────────────────────────

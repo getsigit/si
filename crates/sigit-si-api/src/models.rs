@@ -139,6 +139,33 @@ pub struct GitCredential {
     pub expires_at: DateTime<Utc>,
 }
 
+// ── Commit statuses ─────────────────────────────────────────────────────────
+
+/// One reported status on a commit, from `POST …/statuses/:sha` and the
+/// `statuses` list of the combined status.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CommitStatus {
+    pub id: i64,
+    pub sha: String,
+    /// `pending`, `success`, `failure` or `error`.
+    pub state: String,
+    pub context: String,
+    pub description: Option<String>,
+    pub target_url: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// `GET …/commits/:sha/status` — every context on a commit and the state they
+/// add up to.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CombinedStatus {
+    pub sha: String,
+    pub state: String,
+    pub total_count: u32,
+    pub statuses: Vec<CommitStatus>,
+}
+
 // ── MCP-backed resources ────────────────────────────────────────────────────
 //
 // Issues, pull requests, and code search have no REST surface; they are served

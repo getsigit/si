@@ -42,6 +42,10 @@ pub enum Command {
     #[command(subcommand)]
     Code(CodeCommand),
 
+    /// Report and read commit statuses, the checks CI shows on a commit.
+    #[command(subcommand)]
+    Status(StatusCommand),
+
     /// Manage a repository's deploy webhooks.
     #[command(subcommand)]
     Hook(HookCommand),
@@ -214,6 +218,34 @@ pub enum CodeCommand {
         r#ref: Option<String>,
         #[arg(long, default_value_t = 20)]
         limit: u32,
+        repo: Option<String>,
+    },
+}
+
+#[derive(clap::Subcommand)]
+pub enum StatusCommand {
+    /// Report a status on a commit.
+    Set {
+        /// A commit SHA, or a branch, tag or other ref in the current repo.
+        sha: String,
+        #[arg(long, value_parser = ["pending", "success", "failure", "error"])]
+        state: String,
+        /// Which check this is, such as ci/test. Defaults to "default".
+        #[arg(long)]
+        context: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        /// Where to see the details, such as a CI run.
+        #[arg(long)]
+        url: Option<String>,
+        #[arg(long)]
+        repo: Option<String>,
+    },
+    /// Show the combined status of a commit and each check behind it.
+    View {
+        /// A commit SHA or ref. Defaults to HEAD.
+        sha: Option<String>,
+        #[arg(long)]
         repo: Option<String>,
     },
 }

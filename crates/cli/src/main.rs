@@ -46,6 +46,7 @@ async fn run() -> Result<()> {
         Command::Pr(command) => commands::pr::run(&ctx, command).await,
         Command::Issue(command) => commands::issue::run(&ctx, command).await,
         Command::Code(command) => commands::code::run(&ctx, command).await,
+        Command::Status(command) => commands::status::run(&ctx, command).await,
         Command::Hook(command) => commands::hook::run(&ctx, command).await,
         Command::Session(command) => commands::session::run(&ctx, command).await,
         Command::Billing(command) => commands::billing::run(&ctx, command).await,
