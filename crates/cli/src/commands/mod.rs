@@ -6,6 +6,7 @@ pub mod code;
 pub mod hook;
 pub mod issue;
 pub mod me;
+pub mod models;
 pub mod pr;
 pub mod repo;
 pub mod run;

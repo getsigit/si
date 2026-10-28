@@ -15,6 +15,10 @@ pub async fn run(ctx: &Ctx, command: AuthCommand) -> Result<()> {
         AuthCommand::Login { email } => login(ctx, email).await,
         AuthCommand::Logout => logout(ctx).await,
         AuthCommand::Status => status(ctx).await,
+        AuthCommand::Signup { email } => signup(ctx, email).await,
+        AuthCommand::Resend { email } => resend(ctx, email).await,
+        AuthCommand::ResetPassword { email } => reset_password(ctx, email).await,
+        AuthCommand::DeleteAccount { yes } => delete_account(ctx, yes).await,
         AuthCommand::SetupGit => setup_git(ctx),
         AuthCommand::GitCredential { operation } => git_credential(ctx, operation).await,
     }
@@ -48,6 +52,69 @@ async fn git_credential(ctx: &Ctx, operation: GitCredentialOperation) -> Result<
     let mut stdout = io::stdout().lock();
     stdout.write_all(credential::response(&minted.username, &minted.git_token).as_bytes())?;
     stdout.flush()?;
+    Ok(())
+}
+
+fn email_or_prompt(email: Option<String>) -> Result<String> {
+    match email {
+        Some(email) => Ok(email),
+        None => ui::prompt::text("Email"),
+    }
+}
+
+async fn signup(ctx: &Ctx, email: Option<String>) -> Result<()> {
+    let email = email_or_prompt(email)?;
+    let password = ui::prompt::new_password("Password")?;
+
+    let result = ctx.client.sign_up(&email, &password).await?;
+    ui::emit(ctx.json, &result, |result| {
+        let message = result["message"]
+            .as_str()
+            .unwrap_or("Signed up. Check your email to confirm your account.");
+        ui::success(message);
+        ui::note("Once it is confirmed, run `si auth login`.");
+    })
+}
+
+async fn resend(ctx: &Ctx, email: Option<String>) -> Result<()> {
+    let email = email_or_prompt(email)?;
+    ctx.client.resend_confirmation(&email).await?;
+    ui::success(format!(
+        "If {} has an account that is not confirmed yet, a new email is on its way.",
+        ui::highlight(&email)
+    ));
+    Ok(())
+}
+
+async fn reset_password(ctx: &Ctx, email: Option<String>) -> Result<()> {
+    let email = email_or_prompt(email)?;
+    ctx.client.reset_password(&email).await?;
+    ui::success(format!(
+        "If {} has an account, reset instructions are on their way.",
+        ui::highlight(&email)
+    ));
+    Ok(())
+}
+
+async fn delete_account(ctx: &Ctx, yes: bool) -> Result<()> {
+    ctx.require_token()?;
+
+    if !yes {
+        let user = ctx.client.user().await?;
+        ui::note(format!(
+            "This permanently deletes the account {} and everything in it.",
+            user.email
+        ));
+        let typed = ui::prompt::text(&format!("Type {} to confirm", user.email))?;
+        if !typed.trim().eq_ignore_ascii_case(&user.email) {
+            ui::note("Cancelled.");
+            return Ok(());
+        }
+    }
+
+    ctx.client.delete_account().await?;
+    config::clear_token(ctx.environment)?;
+    ui::success("Your account was deleted.");
     Ok(())
 }
 

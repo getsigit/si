@@ -6,7 +6,8 @@ use {
     console::style,
     sigit_si_api::models::{
         AgentRun, Billing, CloudSession, CodeHit, CombinedStatus, Comment, Hook, Issue,
-        IssueSummary, PullRequest, PullRequestSummary, Repository, RepositorySummary, Site, User,
+        IssueSummary, Model, PullRequest, PullRequestSummary, Repository, RepositorySummary, Site,
+        User,
     },
     tabled::{builder::Builder, settings::Style},
 };
@@ -491,6 +492,32 @@ pub fn site(site: &Site) {
         );
     }
     println!();
+}
+
+// ── Models ──────────────────────────────────────────────────────────────────
+
+pub fn models(models: &[Model]) {
+    let rows = models
+        .iter()
+        .map(|model| {
+            vec![
+                model.id.clone(),
+                model
+                    .display_name
+                    .clone()
+                    .unwrap_or_else(|| "—".to_string()),
+                model.capability.clone().unwrap_or_else(|| "—".to_string()),
+                if model.vision { "yes" } else { "no" }.to_string(),
+                if model.default { "default" } else { "" }.to_string(),
+            ]
+        })
+        .collect();
+
+    table(
+        &["Model", "Name", "Capability", "Vision", ""],
+        rows,
+        "No models are available right now.",
+    );
 }
 
 // ── Billing ─────────────────────────────────────────────────────────────────

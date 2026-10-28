@@ -66,6 +66,9 @@ pub enum Command {
     #[command(subcommand)]
     Billing(BillingCommand),
 
+    /// List the models a session can use.
+    Models,
+
     /// Open something on sigit.si in your browser.
     Browse(BrowseArgs),
 
@@ -88,6 +91,27 @@ pub enum AuthCommand {
     Logout,
     /// Show who is currently signed in.
     Status,
+    /// Create a sigit.si account. A confirmation email follows.
+    Signup {
+        #[arg(long)]
+        email: Option<String>,
+    },
+    /// Send the confirmation email again.
+    Resend {
+        #[arg(long)]
+        email: Option<String>,
+    },
+    /// Email instructions for choosing a new password.
+    ResetPassword {
+        #[arg(long)]
+        email: Option<String>,
+    },
+    /// Permanently delete your account.
+    DeleteAccount {
+        /// Skip the typed confirmation.
+        #[arg(short, long)]
+        yes: bool,
+    },
     /// Let git use your sigit.si sign-in for clones and fetches, by adding a
     /// credential helper to your global git config.
     SetupGit,

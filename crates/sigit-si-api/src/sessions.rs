@@ -3,7 +3,7 @@
 use crate::{
     client::Client,
     error::Result,
-    models::{AppendedMessage, CloudSession},
+    models::{AppendedMessage, CloudSession, Model},
 };
 
 impl Client {
@@ -35,6 +35,17 @@ impl Client {
     ) -> Result<CloudSession> {
         self.patch(&format!("sessions/{id}"), &session_body(title, model))
             .await
+    }
+
+    /// `GET /api/v1/models` — the models a session can use. The server lists
+    /// them in the OpenAI shape, `{"data": [...]}`; this unwraps it.
+    pub async fn models(&self) -> Result<Vec<Model>> {
+        #[derive(serde::Deserialize)]
+        struct Models {
+            data: Vec<Model>,
+        }
+        let models: Models = self.get("models").await?;
+        Ok(models.data)
     }
 
     /// `DELETE /api/v1/sessions/:id`
@@ -70,6 +81,16 @@ fn session_body(title: Option<&str>, model: Option<&str>) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_model_without_the_default_flag_is_not_the_default() {
+        let model: Model = serde_json::from_str(
+            r#"{"id":"m","object":"model","owned_by":"sigit","display_name":"M",
+                "capability":"fast","vision":false}"#,
+        )
+        .unwrap();
+        assert!(!model.default);
+    }
 
     #[test]
     fn omitted_fields_stay_out_of_the_update_body() {

@@ -210,6 +210,21 @@ pub struct Site {
     pub bytes: i64,
 }
 
+// ── Models ──────────────────────────────────────────────────────────────────
+
+/// One entry of `GET /api/v1/models`, the models you can pick for a session.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Model {
+    pub id: String,
+    pub display_name: Option<String>,
+    pub capability: Option<String>,
+    #[serde(default)]
+    pub vision: bool,
+    /// Set on the model the calling client uses when none is named.
+    #[serde(default)]
+    pub default: bool,
+}
+
 // ── MCP-backed resources ────────────────────────────────────────────────────
 //
 // Issues, pull requests, and code search have no REST surface; they are served

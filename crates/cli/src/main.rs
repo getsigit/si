@@ -52,6 +52,7 @@ async fn run() -> Result<()> {
         Command::Hook(command) => commands::hook::run(&ctx, command).await,
         Command::Session(command) => commands::session::run(&ctx, command).await,
         Command::Billing(command) => commands::billing::run(&ctx, command).await,
+        Command::Models => commands::models::run(&ctx).await,
         Command::Browse(args) => commands::browse::run(&ctx, args).await,
         Command::Api(args) => commands::api::run(&ctx, args).await,
         // Takes `ctx` by value: the server outlives the dispatch, serving

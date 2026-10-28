@@ -48,6 +48,18 @@ impl Client {
         .await
     }
 
+    /// `POST /api/v1/auth/password/reset` — emails reset instructions. The
+    /// server answers the same way whether or not the address has an account.
+    pub async fn reset_password(&self, email: &str) -> Result<()> {
+        self.send_empty(self.reset_password_request(email)).await
+    }
+
+    fn reset_password_request(&self, email: &str) -> reqwest::RequestBuilder {
+        let body = serde_json::json!({ "email": email.trim().to_ascii_lowercase() });
+        self.request(Method::POST, "auth/password/reset")
+            .json(&body)
+    }
+
     /// `DELETE /api/v1/me` — permanently deletes the signed-in account.
     pub async fn delete_account(&self) -> Result<()> {
         self.delete("me").await
@@ -67,5 +79,31 @@ pub fn incomplete_reason(status: u32) -> &'static str {
         1002 => "Your account is locked.",
         1003 => "Your account is not active yet.",
         _ => "Your account is not ready to sign in yet. Finish setting it up at https://sigit.si/auth.",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, crate::Environment};
+
+    #[test]
+    fn a_reset_posts_the_normalized_email() {
+        let client = Client::builder(Environment::Production)
+            .base_url("https://sigit.si")
+            .build()
+            .unwrap();
+        let request = client
+            .reset_password_request("  Seto@Example.com ")
+            .build()
+            .unwrap();
+
+        assert_eq!(request.method(), Method::POST);
+        assert_eq!(
+            request.url().as_str(),
+            "https://sigit.si/api/v1/auth/password/reset"
+        );
+        let body = request.body().and_then(|b| b.as_bytes()).unwrap();
+        let body: serde_json::Value = serde_json::from_slice(body).unwrap();
+        assert_eq!(body["email"], "seto@example.com");
     }
 }
