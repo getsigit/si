@@ -10,4 +10,5 @@ pub mod pr;
 pub mod repo;
 pub mod run;
 pub mod session;
+pub mod site;
 pub mod status;

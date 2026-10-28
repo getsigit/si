@@ -194,6 +194,22 @@ pub struct AgentRun {
     pub transcript_tail: Option<String>,
 }
 
+// ── Sites ───────────────────────────────────────────────────────────────────
+
+/// A repository's published static site.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Site {
+    pub url: String,
+    /// `publishing`, `live` or `failed`.
+    pub state: String,
+    pub error: Option<String>,
+    pub last_published_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub files: i64,
+    #[serde(default)]
+    pub bytes: i64,
+}
+
 // ── MCP-backed resources ────────────────────────────────────────────────────
 //
 // Issues, pull requests, and code search have no REST surface; they are served

@@ -56,6 +56,8 @@ pub mod repos;
 #[cfg(feature = "client")]
 pub mod sessions;
 #[cfg(feature = "client")]
+pub mod sites;
+#[cfg(feature = "client")]
 pub mod statuses;
 
 /// Request header a client uses to name itself. [`client::ClientBuilder::client_name`]

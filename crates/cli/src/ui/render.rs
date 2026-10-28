@@ -6,7 +6,7 @@ use {
     console::style,
     sigit_si_api::models::{
         AgentRun, Billing, CloudSession, CodeHit, CombinedStatus, Comment, Hook, Issue,
-        IssueSummary, PullRequest, PullRequestSummary, Repository, RepositorySummary, User,
+        IssueSummary, PullRequest, PullRequestSummary, Repository, RepositorySummary, Site, User,
     },
     tabled::{builder::Builder, settings::Style},
 };
@@ -466,6 +466,31 @@ pub fn agent_run_detail(run: &AgentRun) {
         }
         println!();
     }
+}
+
+// ── Sites ───────────────────────────────────────────────────────────────────
+
+pub fn site(site: &Site) {
+    let state = match site.state.as_str() {
+        "live" => style("live").green().to_string(),
+        "failed" => style("failed").red().to_string(),
+        "publishing" => style("publishing").yellow().to_string(),
+        other => style(other).dim().to_string(),
+    };
+    println!();
+    println!("  {}  {}", highlight(&site.url), state);
+    field("Error", site.error.as_deref());
+    field(
+        "Published",
+        site.last_published_at.map(relative_time).as_deref(),
+    );
+    if site.files > 0 {
+        field(
+            "Size",
+            Some(&format!("{} files, {} bytes", site.files, site.bytes)),
+        );
+    }
+    println!();
 }
 
 // ── Billing ─────────────────────────────────────────────────────────────────

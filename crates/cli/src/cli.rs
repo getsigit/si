@@ -46,6 +46,10 @@ pub enum Command {
     #[command(subcommand)]
     Run(RunCommand),
 
+    /// Publish a repository's default branch as a static site.
+    #[command(subcommand)]
+    Site(SiteCommand),
+
     /// Report and read commit statuses, the checks CI shows on a commit.
     #[command(subcommand)]
     Status(StatusCommand),
@@ -246,6 +250,31 @@ pub enum RunCommand {
     /// Print the branch, prompt and command for continuing a run on your own
     /// machine.
     Handoff { id: i64 },
+}
+
+#[derive(clap::Subcommand)]
+pub enum SiteCommand {
+    /// Show a repository's site: its address and whether it is live.
+    View {
+        #[arg(long)]
+        repo: Option<String>,
+    },
+    /// Publish the default branch, or publish it again.
+    Publish {
+        /// Wait until the site is live or the publish has failed.
+        #[arg(long)]
+        wait: bool,
+        #[arg(long)]
+        repo: Option<String>,
+    },
+    /// Take the site offline.
+    Unpublish {
+        #[arg(long)]
+        repo: Option<String>,
+        /// Skip the confirmation prompt.
+        #[arg(short, long)]
+        yes: bool,
+    },
 }
 
 #[derive(clap::Subcommand)]
