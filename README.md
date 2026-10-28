@@ -2,7 +2,7 @@
 
 `si` is the command line interface for [sigit.si](https://sigit.si) — sign in,
 manage repositories, review pull requests, triage issues, search code, and
-drive Cloud Sessions, all from the terminal. It's the `gh` of sigit.si.
+drive Cloud Sessions, all from the terminal.
 
 ## Install
 

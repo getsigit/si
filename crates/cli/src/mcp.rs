@@ -23,9 +23,8 @@
 //! skipping the `ui` layer entirely: stdout is the JSON-RPC channel, so
 //! nothing here may print to it. Logging already goes to stderr (see `main`).
 //!
-//! Toolsets and `--read-only` follow the convention GitHub's `github-mcp-server`
-//! set — trimming the tool list keeps the model's choice sharp and its context
-//! small.
+//! Toolsets and `--read-only` exist because trimming the tool list keeps the
+//! model's choice sharp and its context small.
 
 use {
     crate::{

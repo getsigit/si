@@ -1,7 +1,7 @@
 //! Working-directory git awareness.
 //!
-//! The point of a `gh`-style CLI is that you rarely have to name the repo — it
-//! reads the one you're standing in. This module answers two questions about
+//! The point of this CLI is that you rarely have to name the repo: it reads
+//! the one you're standing in. This module answers two questions about
 //! the current directory: which sigit.si repo does it point at, and what branch
 //! is checked out.
 
