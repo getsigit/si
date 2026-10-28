@@ -5,8 +5,8 @@ use {
     super::{bold, dim, highlight, relative_time, state_badge},
     console::style,
     sigit_si_api::models::{
-        Billing, CloudSession, CodeHit, CombinedStatus, Comment, Hook, Issue, IssueSummary,
-        PullRequest, PullRequestSummary, Repository, RepositorySummary, User,
+        AgentRun, Billing, CloudSession, CodeHit, CombinedStatus, Comment, Hook, Issue,
+        IssueSummary, PullRequest, PullRequestSummary, Repository, RepositorySummary, User,
     },
     tabled::{builder::Builder, settings::Style},
 };
@@ -399,6 +399,73 @@ pub fn combined_status(combined: &CombinedStatus) {
         rows,
         "No statuses have been reported on this commit.",
     );
+}
+
+// ── Agent runs ──────────────────────────────────────────────────────────────
+
+fn run_badge(status: &str) -> String {
+    match status {
+        "succeeded" | "completed" => style(status).green().to_string(),
+        "failed" | "errored" | "timed_out" => style(status).red().to_string(),
+        "running" | "queued" | "pending" => style(status).yellow().to_string(),
+        other => style(other).dim().to_string(),
+    }
+}
+
+pub fn agent_runs(runs: &[AgentRun]) {
+    let rows = runs
+        .iter()
+        .map(|run| {
+            vec![
+                run.id.to_string(),
+                truncate(run.title.as_deref().unwrap_or("(untitled)"), 40),
+                run.repo_full_name.clone(),
+                run_badge(&run.status),
+                relative_time(run.created_at),
+            ]
+        })
+        .collect();
+
+    table(
+        &["ID", "Title", "Repository", "Status", "Started"],
+        rows,
+        "You have no agent runs yet. Start one with `si run start`.",
+    );
+}
+
+pub fn agent_run_detail(run: &AgentRun) {
+    println!();
+    println!(
+        "  {}  {}",
+        highlight(run.title.as_deref().unwrap_or("(untitled run)")),
+        run_badge(&run.status)
+    );
+    field("ID", Some(&run.id.to_string()));
+    field("Repository", Some(&run.repo_full_name));
+    field("Triggered by", Some(&run.trigger_kind));
+    field("Base", run.base_branch.as_deref());
+    field("Branch", run.head_branch.as_deref());
+    field("Pull request", run.pull_request_url.as_deref());
+    field("Exit reason", run.exit_reason.as_deref());
+    field("Requests", Some(&run.inference_requests_used.to_string()));
+    if run.cancel_requested {
+        field("Cancel", Some("requested"));
+    }
+    field("Created", Some(&relative_time(run.created_at)));
+    field("Finished", run.finished_at.map(relative_time).as_deref());
+    println!();
+
+    if let Some(tail) = run
+        .transcript_tail
+        .as_deref()
+        .filter(|t| !t.trim().is_empty())
+    {
+        println!("  {}", dim("Transcript (end)"));
+        for line in tail.lines() {
+            println!("    {line}");
+        }
+        println!();
+    }
 }
 
 // ── Billing ─────────────────────────────────────────────────────────────────

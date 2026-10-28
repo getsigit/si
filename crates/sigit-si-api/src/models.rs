@@ -166,6 +166,34 @@ pub struct CombinedStatus {
     pub statuses: Vec<CommitStatus>,
 }
 
+// ── Agent runs ──────────────────────────────────────────────────────────────
+
+/// A siGit Code Cloud Agent run. `transcript_tail` is only present on the
+/// single-run read.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AgentRun {
+    pub id: i64,
+    pub title: Option<String>,
+    pub repo_full_name: String,
+    pub trigger_kind: String,
+    pub status: String,
+    #[serde(default)]
+    pub cancel_requested: bool,
+    pub exit_reason: Option<String>,
+    pub base_branch: Option<String>,
+    pub head_branch: Option<String>,
+    pub pull_request_url: Option<String>,
+    pub issue_number: Option<i64>,
+    pub pr_number: Option<i64>,
+    #[serde(default)]
+    pub inference_requests_used: i64,
+    pub created_at: DateTime<Utc>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub finished_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcript_tail: Option<String>,
+}
+
 // ── MCP-backed resources ────────────────────────────────────────────────────
 //
 // Issues, pull requests, and code search have no REST surface; they are served

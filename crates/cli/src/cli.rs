@@ -42,6 +42,10 @@ pub enum Command {
     #[command(subcommand)]
     Code(CodeCommand),
 
+    /// Start and follow siGit Code Cloud Agent runs.
+    #[command(subcommand)]
+    Run(RunCommand),
+
     /// Report and read commit statuses, the checks CI shows on a commit.
     #[command(subcommand)]
     Status(StatusCommand),
@@ -220,6 +224,28 @@ pub enum CodeCommand {
         limit: u32,
         repo: Option<String>,
     },
+}
+
+#[derive(clap::Subcommand)]
+pub enum RunCommand {
+    /// List your agent runs, newest first.
+    List,
+    /// Show a run's status and the end of its transcript.
+    View { id: i64 },
+    /// Start a run on a GitHub repository where the siGit Code app is
+    /// installed and your connected GitHub account can write.
+    Start {
+        /// OWNER/NAME of the GitHub repository.
+        #[arg(long)]
+        repo: String,
+        /// What the agent should do.
+        prompt: String,
+    },
+    /// Ask a running agent to stop.
+    Cancel { id: i64 },
+    /// Print the branch, prompt and command for continuing a run on your own
+    /// machine.
+    Handoff { id: i64 },
 }
 
 #[derive(clap::Subcommand)]

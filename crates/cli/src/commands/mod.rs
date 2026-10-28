@@ -8,5 +8,6 @@ pub mod issue;
 pub mod me;
 pub mod pr;
 pub mod repo;
+pub mod run;
 pub mod session;
 pub mod status;

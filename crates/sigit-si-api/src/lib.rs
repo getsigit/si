@@ -35,6 +35,8 @@
 #[cfg(feature = "client")]
 pub mod account;
 #[cfg(feature = "client")]
+pub mod agent_runs;
+#[cfg(feature = "client")]
 pub mod billing;
 #[cfg(feature = "client")]
 pub mod client;
