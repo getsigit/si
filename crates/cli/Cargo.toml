@@ -24,7 +24,7 @@ dialoguer = { workspace = true }
 dirs = { workspace = true }
 git2 = { workspace = true }
 open = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, features = ["rustls-tls-native-roots"] }
 rmcp = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true }

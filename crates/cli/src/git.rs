@@ -1,7 +1,7 @@
 //! Working-directory git awareness.
 //!
-//! The point of a `gh`-style CLI is that you rarely have to name the repo — it
-//! reads the one you're standing in. This module answers two questions about
+//! The point of this CLI is that you rarely have to name the repo: it reads
+//! the one you're standing in. This module answers two questions about
 //! the current directory: which sigit.si repo does it point at, and what branch
 //! is checked out.
 
@@ -86,6 +86,29 @@ pub fn current_branch(dir: &Path) -> Option<String> {
     head.shorthand().map(str::to_string)
 }
 
+/// Resolve a ref (or `HEAD`) in the repository around `dir` to a full commit
+/// SHA. A full SHA that this checkout doesn't have is passed through, since
+/// the commit may only exist on the server.
+pub fn resolve_sha(dir: &Path, rev: &str) -> Result<String> {
+    let found = GitRepository::discover(dir).ok().and_then(|repository| {
+        let object = repository.revparse_single(rev).ok()?;
+        Some(object.peel_to_commit().ok()?.id().to_string())
+    });
+
+    match found {
+        Some(sha) => Ok(sha),
+        None if is_full_sha(rev) => Ok(rev.to_ascii_lowercase()),
+        None => Err(anyhow!(
+            "Could not resolve {rev:?} to a commit. Run this inside a clone of the repository, \
+             or pass the full commit SHA."
+        )),
+    }
+}
+
+fn is_full_sha(text: &str) -> bool {
+    text.len() == 40 && text.chars().all(|c| c.is_ascii_hexdigit())
+}
+
 /// `origin` first, then `sigit`, then the rest in their configured order.
 fn preferred_order(names: &[String]) -> Vec<String> {
     let mut ordered = Vec::with_capacity(names.len());
@@ -133,7 +156,7 @@ fn split_host_and_path(url: &str) -> Option<(String, String)> {
 
 /// Compare hosts ignoring the port and a leading `www.`, so a dev remote on
 /// `localhost:3000` matches a `localhost` base URL and vice versa.
-fn hosts_match(a: &str, b: &str) -> bool {
+pub fn hosts_match(a: &str, b: &str) -> bool {
     fn normalize(host: &str) -> String {
         let host = host.trim().to_ascii_lowercase();
         let host = host
@@ -218,6 +241,34 @@ mod tests {
         )
         .unwrap();
         assert_eq!(slug.to_string(), "seto/demo");
+    }
+
+    #[test]
+    fn a_ref_resolves_to_its_commit() {
+        let dir = tempfile::tempdir().unwrap();
+        let repository = GitRepository::init(dir.path()).unwrap();
+        let signature = git2::Signature::now("t", "t@example.com").unwrap();
+        let tree = repository
+            .find_tree(repository.treebuilder(None).unwrap().write().unwrap())
+            .unwrap();
+        let id = repository
+            .commit(Some("HEAD"), &signature, &signature, "init", &tree, &[])
+            .unwrap();
+
+        assert_eq!(resolve_sha(dir.path(), "HEAD").unwrap(), id.to_string());
+    }
+
+    #[test]
+    fn an_unknown_full_sha_is_passed_through() {
+        let dir = tempfile::tempdir().unwrap();
+        let sha = "A".repeat(40);
+        assert_eq!(resolve_sha(dir.path(), &sha).unwrap(), "a".repeat(40));
+    }
+
+    #[test]
+    fn an_unknown_ref_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(resolve_sha(dir.path(), "main").is_err());
     }
 
     #[test]

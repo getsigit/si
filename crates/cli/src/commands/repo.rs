@@ -2,13 +2,25 @@ use {
     crate::{
         cli::RepoCommand,
         context::Ctx,
+        credential,
+        git::RepoSlug,
         ui::{self, prompt},
     },
-    anyhow::Result,
+    anyhow::{Context, Result},
     sigit_si_api::NewRepository,
 };
 
 pub async fn run(ctx: &Ctx, command: RepoCommand) -> Result<()> {
+    // A public repository clones without signing in.
+    if let RepoCommand::Clone {
+        repo,
+        dir,
+        git_args,
+    } = command
+    {
+        return clone(ctx, &repo, dir.as_deref(), &git_args);
+    }
+
     ctx.require_token()?;
 
     match command {
@@ -22,7 +34,15 @@ pub async fn run(ctx: &Ctx, command: RepoCommand) -> Result<()> {
             yes,
         } => create(ctx, name, private, description, yes).await,
         RepoCommand::Browse { repo } => browse(ctx, repo).await,
+        RepoCommand::Clone { .. } => unreachable!("handled before the token check"),
     }
+}
+
+fn clone(ctx: &Ctx, repo: &str, dir: Option<&str>, git_args: &[String]) -> Result<()> {
+    let slug = RepoSlug::parse(repo)?;
+    let exe = std::env::current_exe().context("Could not locate the `si` executable.")?;
+    let args = credential::clone_args(ctx.client.base_url(), &exe, &slug, dir, git_args);
+    credential::clone(&args)
 }
 
 async fn list(ctx: &Ctx) -> Result<()> {

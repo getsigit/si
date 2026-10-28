@@ -2,8 +2,9 @@
 
 use {
     crate::{
-        environment::Environment,
+        environment::{normalize_host, Environment},
         error::{ApiError, ErrorResponse, Result},
+        CLIENT_HEADER,
     },
     reqwest::{Method, RequestBuilder, StatusCode},
     serde::{de::DeserializeOwned, Serialize},
@@ -22,28 +23,107 @@ pub struct Client {
     environment: Environment,
     api_url: String,
     base_url: String,
+    client_name: Option<String>,
     token: Option<String>,
+}
+
+/// Builds a [`Client`]. Get one from [`Client::builder`].
+#[derive(Debug)]
+pub struct ClientBuilder {
+    environment: Environment,
+    http: Option<reqwest::Client>,
+    user_agent: Option<String>,
+    base_url: Option<String>,
+    client_name: Option<String>,
+    token: Option<String>,
+}
+
+impl ClientBuilder {
+    /// Use this `reqwest::Client` (and so its connection pool, TLS backend and
+    /// user agent) instead of building one. Required for HTTPS when the crate
+    /// is compiled without a TLS feature.
+    pub fn http_client(mut self, http: reqwest::Client) -> Self {
+        self.http = Some(http);
+        self
+    }
+
+    /// The `User-Agent` of the client the crate builds. Ignored when
+    /// [`ClientBuilder::http_client`] is set.
+    pub fn user_agent(mut self, user_agent: &str) -> Self {
+        self.user_agent = Some(user_agent.to_string());
+        self
+    }
+
+    /// An explicit origin such as `https://sigit.si` or `localhost:4000`. A
+    /// missing scheme takes the environment's default and a trailing slash is
+    /// dropped. It takes the place of the environment's defaults, so
+    /// `SIGIT_HOST` has no effect.
+    pub fn base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = Some(base_url.into());
+        self
+    }
+
+    /// Name this client in the [`CLIENT_HEADER`] header on every request.
+    pub fn client_name(mut self, name: &str) -> Self {
+        self.client_name = Some(name.to_string());
+        self
+    }
+
+    /// The bearer token sent on every request.
+    pub fn token(mut self, token: impl Into<String>) -> Self {
+        self.token = Some(token.into());
+        self
+    }
+
+    pub fn build(self) -> Result<Client> {
+        let environment = self.environment;
+        let base_url = match self.base_url {
+            Some(url) => normalize_host(url.trim(), environment.default_scheme()),
+            None => environment.base_url(),
+        };
+
+        let http = match self.http {
+            Some(http) => http,
+            None => reqwest::Client::builder()
+                .user_agent(self.user_agent.as_deref().unwrap_or(USER_AGENT))
+                .build()
+                .map_err(|source| ApiError::Transport {
+                    host: base_url.clone(),
+                    source,
+                })?,
+        };
+
+        Ok(Client {
+            http,
+            environment,
+            api_url: format!("{base_url}/api/v1"),
+            base_url,
+            client_name: self.client_name,
+            token: self.token,
+        })
+    }
 }
 
 impl Client {
     /// An unauthenticated client. Every endpoint on this API needs a token, so
     /// this is mostly a starting point for [`Client::with_token`].
+    ///
+    /// Shorthand for `Client::builder(environment).build()`.
     pub fn new(environment: Environment) -> Result<Self> {
-        let http = reqwest::Client::builder()
-            .user_agent(USER_AGENT)
-            .build()
-            .map_err(|source| ApiError::Transport {
-                host: environment.base_url(),
-                source,
-            })?;
+        Self::builder(environment).build()
+    }
 
-        Ok(Self {
-            http,
+    /// Start configuring a client: base URL, user agent, client name, or your
+    /// own `reqwest::Client`.
+    pub fn builder(environment: Environment) -> ClientBuilder {
+        ClientBuilder {
             environment,
-            api_url: environment.api_url(),
-            base_url: environment.base_url(),
+            http: None,
+            user_agent: None,
+            base_url: None,
+            client_name: None,
             token: None,
-        })
+        }
     }
 
     /// Attach the bearer token sent on every subsequent request.
@@ -123,7 +203,10 @@ impl Client {
     /// Build a request against `<api_url>/<path>`, carrying the bearer token.
     pub fn request(&self, method: Method, path: &str) -> RequestBuilder {
         let url = format!("{}/{}", self.api_url, path.trim_start_matches('/'));
-        let builder = self.http.request(method, url);
+        let mut builder = self.http.request(method, url);
+        if let Some(name) = &self.client_name {
+            builder = builder.header(CLIENT_HEADER, name);
+        }
         match &self.token {
             Some(token) => builder.bearer_auth(token),
             None => builder,
@@ -214,6 +297,48 @@ fn truncate_for_message(body: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_explicit_base_url_replaces_the_environment_default() {
+        let client = Client::builder(Environment::Production)
+            .base_url("127.0.0.1:3000/")
+            .build()
+            .unwrap();
+
+        assert_eq!(client.base_url(), "https://127.0.0.1:3000");
+        assert_eq!(client.api_url(), "https://127.0.0.1:3000/api/v1");
+    }
+
+    #[test]
+    fn a_bare_base_url_takes_the_environment_scheme() {
+        let client = Client::builder(Environment::Dev)
+            .base_url("127.0.0.1:3000")
+            .build()
+            .unwrap();
+        assert_eq!(client.api_url(), "http://127.0.0.1:3000/api/v1");
+    }
+
+    #[test]
+    fn requests_carry_the_client_name_and_token() {
+        let client = Client::builder(Environment::Production)
+            .base_url("https://sigit.si")
+            .client_name("example.app")
+            .token("tok")
+            .build()
+            .unwrap();
+        let request = client.request(Method::DELETE, "/me").build().unwrap();
+        assert_eq!(request.url().as_str(), "https://sigit.si/api/v1/me");
+        assert_eq!(request.method(), Method::DELETE);
+        assert_eq!(request.headers()[CLIENT_HEADER], "example.app");
+        assert_eq!(request.headers()["authorization"], "Bearer tok");
+    }
+
+    #[test]
+    fn requests_omit_the_client_header_by_default() {
+        let client = Client::new(Environment::Production).unwrap();
+        let request = client.request(Method::GET, "user").build().unwrap();
+        assert!(request.headers().get(CLIENT_HEADER).is_none());
+    }
 
     #[test]
     fn unauthorized_maps_to_the_dedicated_variant() {

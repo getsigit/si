@@ -2,7 +2,7 @@
 
 `si` is the command line interface for [sigit.si](https://sigit.si) — sign in,
 manage repositories, review pull requests, triage issues, search code, and
-drive Cloud Sessions, all from the terminal. It's the `gh` of sigit.si.
+drive Cloud Sessions, all from the terminal.
 
 ## Install
 
@@ -18,6 +18,8 @@ This installs a binary named `si`.
 si auth login                     # sign in with your sigit.si account
 si repo list                      # your repositories
 si repo create my-project --private
+si repo clone seto/my-project      # clone with your sign-in, no token in the URL
+si auth setup-git                  # or let plain `git clone` use it too
 
 # Inside a repo checkout, si infers OWNER/NAME from the sigit.si git remote —
 # --repo is only needed when you're not standing in one.
@@ -31,8 +33,21 @@ si issue create --title "Bug: ..." --body "Steps to reproduce..."
 si code search "TODO" --ref main
 si code view README.md
 
+si status set HEAD --state success --context ci/test
+si status view                     # the checks on HEAD
+
+si run start --repo seto/app "Fix the failing build"
+si run list
+si run view 12                     # status and the end of the transcript
+
+si site publish --wait             # publish the default branch as a site
+si site view
+
 si session new --title "Refactor auth"
+si models
 si billing show
+
+si auth signup                     # also: resend, reset-password, delete-account
 
 si browse                          # open the current repo on sigit.si
 si api repos                       # raw escape hatch for any endpoint
@@ -87,7 +102,7 @@ CI authenticates without an interactive login.
 
 - **`crates/sigit-si-api`** — a standalone, typed Rust client for the sigit.si
   JSON API. No CLI dependencies (clap, dialoguer, …); usable from any Rust
-  project that wants to talk to sigit.si, including the desktop app.
+  project that wants to talk to sigit.si.
 - **`crates/cli`** — the `si` binary: command parsing, terminal rendering, git
   remote resolution, and credential storage, built on top of `sigit-si-api`.
 
@@ -120,6 +135,13 @@ the registry fetches the crate from crates.io and looks for the
 this file. Crate versions are immutable, so a release that ships without the
 marker can never be listed, and fixing it costs a new version. The internal
 setup and release runbook live with the server (private `sigit-si` repo).
+
+To cut a release, bump `[workspace.package].version` and the `sigit-si-api`
+dependency in the root `Cargo.toml`, merge `development` into `main`, and push a
+`vX.Y.Z` tag. `release-crates.yml` checks the crate versions against the tag,
+publishes whichever of `sigit-si-api` and `sigit-si-cli` isn't on crates.io yet
+(through Trusted Publishing, so no token is stored), then dispatches
+`release-mcp-registry.yml`.
 
 ## Development
 

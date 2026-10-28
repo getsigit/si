@@ -2,7 +2,7 @@
 
 /// The API's error body — `Api::BaseController#render_error` renders every
 /// failure as `{ "error_code": <i32>, "message": <string> }`.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ErrorResponse {
     pub error_code: i32,
     pub message: String,
@@ -16,8 +16,10 @@ pub mod codes {
     pub const INVALID: i32 = 101;
 }
 
+#[cfg(feature = "client")]
 pub type Result<T> = std::result::Result<T, ApiError>;
 
+#[cfg(feature = "client")]
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
     /// The token is missing, expired, or rejected. Callers treat this as
@@ -56,6 +58,7 @@ pub enum ApiError {
     Parse(String),
 }
 
+#[cfg(feature = "client")]
 impl ApiError {
     /// True when the caller should discard the stored credentials.
     pub fn is_auth_failure(&self) -> bool {

@@ -42,6 +42,18 @@ pub enum Command {
     #[command(subcommand)]
     Code(CodeCommand),
 
+    /// Start and follow siGit Code Cloud Agent runs.
+    #[command(subcommand)]
+    Run(RunCommand),
+
+    /// Publish a repository's default branch as a static site.
+    #[command(subcommand)]
+    Site(SiteCommand),
+
+    /// Report and read commit statuses, the checks CI shows on a commit.
+    #[command(subcommand)]
+    Status(StatusCommand),
+
     /// Manage a repository's deploy webhooks.
     #[command(subcommand)]
     Hook(HookCommand),
@@ -53,6 +65,9 @@ pub enum Command {
     /// Plan, usage, and the hosted billing portal.
     #[command(subcommand)]
     Billing(BillingCommand),
+
+    /// List the models a session can use.
+    Models,
 
     /// Open something on sigit.si in your browser.
     Browse(BrowseArgs),
@@ -76,6 +91,43 @@ pub enum AuthCommand {
     Logout,
     /// Show who is currently signed in.
     Status,
+    /// Create a sigit.si account. A confirmation email follows.
+    Signup {
+        #[arg(long)]
+        email: Option<String>,
+    },
+    /// Send the confirmation email again.
+    Resend {
+        #[arg(long)]
+        email: Option<String>,
+    },
+    /// Email instructions for choosing a new password.
+    ResetPassword {
+        #[arg(long)]
+        email: Option<String>,
+    },
+    /// Permanently delete your account.
+    DeleteAccount {
+        /// Skip the typed confirmation.
+        #[arg(short, long)]
+        yes: bool,
+    },
+    /// Let git use your sigit.si sign-in for clones and fetches, by adding a
+    /// credential helper to your global git config.
+    SetupGit,
+    /// Git's credential helper protocol. Git runs this; you don't need to.
+    #[command(hide = true)]
+    GitCredential {
+        #[arg(value_enum)]
+        operation: GitCredentialOperation,
+    },
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+pub enum GitCredentialOperation {
+    Get,
+    Store,
+    Erase,
 }
 
 #[derive(clap::Subcommand)]
@@ -107,6 +159,17 @@ pub enum RepoCommand {
     },
     /// Open a repository in your browser.
     Browse { repo: Option<String> },
+    /// Clone a repository with git, signing in through `si` so the token
+    /// never lands in the URL or on disk.
+    Clone {
+        /// OWNER/NAME.
+        repo: String,
+        /// Directory to clone into.
+        dir: Option<String>,
+        /// Extra arguments for `git clone`, after `--`.
+        #[arg(last = true)]
+        git_args: Vec<String>,
+    },
 }
 
 #[derive(clap::Subcommand)]
@@ -187,6 +250,81 @@ pub enum CodeCommand {
         r#ref: Option<String>,
         #[arg(long, default_value_t = 20)]
         limit: u32,
+        repo: Option<String>,
+    },
+}
+
+#[derive(clap::Subcommand)]
+pub enum RunCommand {
+    /// List your agent runs, newest first.
+    List,
+    /// Show a run's status and the end of its transcript.
+    View { id: i64 },
+    /// Start a run on a GitHub repository where the siGit Code app is
+    /// installed and your connected GitHub account can write.
+    Start {
+        /// OWNER/NAME of the GitHub repository.
+        #[arg(long)]
+        repo: String,
+        /// What the agent should do.
+        prompt: String,
+    },
+    /// Ask a running agent to stop.
+    Cancel { id: i64 },
+    /// Print the branch, prompt and command for continuing a run on your own
+    /// machine.
+    Handoff { id: i64 },
+}
+
+#[derive(clap::Subcommand)]
+pub enum SiteCommand {
+    /// Show a repository's site: its address and whether it is live.
+    View {
+        #[arg(long)]
+        repo: Option<String>,
+    },
+    /// Publish the default branch, or publish it again.
+    Publish {
+        /// Wait until the site is live or the publish has failed.
+        #[arg(long)]
+        wait: bool,
+        #[arg(long)]
+        repo: Option<String>,
+    },
+    /// Take the site offline.
+    Unpublish {
+        #[arg(long)]
+        repo: Option<String>,
+        /// Skip the confirmation prompt.
+        #[arg(short, long)]
+        yes: bool,
+    },
+}
+
+#[derive(clap::Subcommand)]
+pub enum StatusCommand {
+    /// Report a status on a commit.
+    Set {
+        /// A commit SHA, or a branch, tag or other ref in the current repo.
+        sha: String,
+        #[arg(long, value_parser = ["pending", "success", "failure", "error"])]
+        state: String,
+        /// Which check this is, such as ci/test. Defaults to "default".
+        #[arg(long)]
+        context: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
+        /// Where to see the details, such as a CI run.
+        #[arg(long)]
+        url: Option<String>,
+        #[arg(long)]
+        repo: Option<String>,
+    },
+    /// Show the combined status of a commit and each check behind it.
+    View {
+        /// A commit SHA or ref. Defaults to HEAD.
+        sha: Option<String>,
+        #[arg(long)]
         repo: Option<String>,
     },
 }

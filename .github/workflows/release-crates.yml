@@ -1,0 +1,192 @@
+name: Publish to crates.io
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.3.0)"
+        required: true
+      dry_run:
+        description: "Package and verify without uploading or dispatching follow-up workflows"
+        type: boolean
+        default: false
+
+concurrency:
+  # A re-pushed or re-dispatched tag fires this a second time. Queue the
+  # duplicate behind the original instead of cancelling it: cancelling a run
+  # mid-publish can leave a crate half-uploaded, whereas a queued duplicate
+  # just hits the "already published" check and exits clean.
+  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+# Publishing uses crates.io Trusted Publishing: the job trades its GitHub OIDC
+# token for a short-lived crates.io token, so no long-lived API token is stored
+# in the repository. Each crate (sigit-si-api and sigit-si-cli) needs a Trusted
+# Publisher entry in its crates.io settings with repository `getsigit/si`,
+# workflow `release-crates.yml`, and no environment. A missing entry shows up
+# as a 403 from the auth step.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      published: ${{ steps.exists.outputs.published }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set release version
+        id: version
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref }}"
+          TAG="${TAG#refs/tags/}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Read Rust toolchain
+        shell: bash
+        run: |
+          rust_toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml | head -n 1)"
+          if [ -z "$rust_toolchain" ]; then
+            echo "Failed to read Rust toolchain from rust-toolchain.toml" >&2
+            exit 1
+          fi
+          echo "RUST_TOOLCHAIN=${rust_toolchain}" >> "$GITHUB_ENV"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: crates-publish
+
+      - name: Check crate versions match the tag
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mismatched=$(cargo metadata --no-deps --format-version 1 | \
+            jq -r --arg v "$VERSION" \
+              '.packages[] | select(.manifest_path | contains("/crates/")) | select(.version != $v) | "\(.name) \(.version)"')
+          if [ -n "$mismatched" ]; then
+            while read -r name version; do
+              echo "::error::${name} is at ${version}, but the tag is v${VERSION}"
+            done <<< "$mismatched"
+            exit 1
+          fi
+
+      - name: Test
+        run: cargo test --workspace --locked
+
+      # The CLI depends on the API crate, so the API goes first. Each crate sits
+      # behind its own "already published" check: a re-run publishes only what
+      # is missing.
+      - name: Check which crates already exist on crates.io
+        id: exists
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          check() {
+            local crate="$1" output="$2" status
+            # crates.io answers 403 to requests without a descriptive
+            # User-Agent, so curl's default one makes this look like a 404 and
+            # the publish below runs into "crate already exists on the index".
+            # Branch on the status code rather than on curl's exit status, so an
+            # answer we do not understand stops the job instead of quietly
+            # degrading into that same failure.
+            # Retry first, so a timeout or a 5xx costs a few seconds instead of
+            # the whole release.
+            status=$(curl -sS -o /dev/null -w '%{http_code}' \
+              --retry 3 --retry-delay 2 --retry-all-errors \
+              -H "User-Agent: ${GITHUB_REPOSITORY} release workflow (https://github.com/${GITHUB_REPOSITORY})" \
+              "https://crates.io/api/v1/crates/${crate}/${VERSION}")
+
+            case "$status" in
+              200)
+                echo "${crate} ${VERSION} already exists on crates.io, skipping publish"
+                echo "${output}=true" >> "$GITHUB_OUTPUT"
+                ;;
+              404)
+                echo "${output}=false" >> "$GITHUB_OUTPUT"
+                ;;
+              *)
+                echo "Unexpected ${status} from crates.io while checking whether ${crate} ${VERSION} is published" >&2
+                exit 1
+                ;;
+            esac
+          }
+
+          check sigit-si-api api_exists
+          check sigit-si-cli cli_exists
+
+      - name: Get a crates.io token
+        id: auth
+        if: ${{ !inputs.dry_run && (steps.exists.outputs.api_exists != 'true' || steps.exists.outputs.cli_exists != 'true') }}
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish sigit-si-api to crates.io
+        if: steps.exists.outputs.api_exists != 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          args=(--locked -p sigit-si-api)
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          cargo publish "${args[@]}"
+
+      # cargo publish waits for the API crate to show up in the index before it
+      # returns, so the CLI can resolve it straight away.
+      - name: Publish sigit-si-cli to crates.io
+        if: steps.exists.outputs.cli_exists != 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          args=(--locked -p sigit-si-cli)
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          cargo publish "${args[@]}"
+
+      - name: Nothing to publish
+        if: steps.exists.outputs.api_exists == 'true' && steps.exists.outputs.cli_exists == 'true'
+        run: echo "Both crates are already on crates.io, nothing to publish"
+
+  # Runs even when nothing new was published: the MCP workflow skips duplicate
+  # versions itself, and waits for crates.io indexing and the mcp-name marker.
+  dispatch-mcp-registry:
+    name: Dispatch MCP Registry release
+    needs: publish
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Trigger MCP Registry release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release-mcp-registry.yml',
+              ref: '${{ needs.publish.outputs.tag }}'
+            })
