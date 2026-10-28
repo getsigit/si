@@ -136,6 +136,13 @@ this file. Crate versions are immutable, so a release that ships without the
 marker can never be listed, and fixing it costs a new version. The internal
 setup and release runbook live with the server (private `sigit-si` repo).
 
+To cut a release, bump `[workspace.package].version` and the `sigit-si-api`
+dependency in the root `Cargo.toml`, merge `development` into `main`, and push a
+`vX.Y.Z` tag. `release-crates.yml` checks the crate versions against the tag,
+publishes whichever of `sigit-si-api` and `sigit-si-cli` isn't on crates.io yet
+(through Trusted Publishing, so no token is stored), then dispatches
+`release-mcp-registry.yml`.
+
 ## Development
 
 ```sh
