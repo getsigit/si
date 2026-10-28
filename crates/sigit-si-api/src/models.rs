@@ -139,6 +139,92 @@ pub struct GitCredential {
     pub expires_at: DateTime<Utc>,
 }
 
+// ── Commit statuses ─────────────────────────────────────────────────────────
+
+/// One reported status on a commit, from `POST …/statuses/:sha` and the
+/// `statuses` list of the combined status.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CommitStatus {
+    pub id: i64,
+    pub sha: String,
+    /// `pending`, `success`, `failure` or `error`.
+    pub state: String,
+    pub context: String,
+    pub description: Option<String>,
+    pub target_url: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// `GET …/commits/:sha/status` — every context on a commit and the state they
+/// add up to.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CombinedStatus {
+    pub sha: String,
+    pub state: String,
+    pub total_count: u32,
+    pub statuses: Vec<CommitStatus>,
+}
+
+// ── Agent runs ──────────────────────────────────────────────────────────────
+
+/// A siGit Code Cloud Agent run. `transcript_tail` is only present on the
+/// single-run read.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AgentRun {
+    pub id: i64,
+    pub title: Option<String>,
+    pub repo_full_name: String,
+    pub trigger_kind: String,
+    pub status: String,
+    #[serde(default)]
+    pub cancel_requested: bool,
+    pub exit_reason: Option<String>,
+    pub base_branch: Option<String>,
+    pub head_branch: Option<String>,
+    pub pull_request_url: Option<String>,
+    pub issue_number: Option<i64>,
+    pub pr_number: Option<i64>,
+    #[serde(default)]
+    pub inference_requests_used: i64,
+    pub created_at: DateTime<Utc>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub finished_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcript_tail: Option<String>,
+}
+
+// ── Sites ───────────────────────────────────────────────────────────────────
+
+/// A repository's published static site.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Site {
+    pub url: String,
+    /// `publishing`, `live` or `failed`.
+    pub state: String,
+    pub error: Option<String>,
+    pub last_published_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub files: i64,
+    #[serde(default)]
+    pub bytes: i64,
+}
+
+// ── Models ──────────────────────────────────────────────────────────────────
+
+/// One entry of `GET /api/v1/models`, the models you can pick for a session.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Model {
+    pub id: String,
+    pub display_name: Option<String>,
+    pub capability: Option<String>,
+    #[serde(default)]
+    pub vision: bool,
+    /// Set on the model the calling client uses when none is named.
+    #[serde(default)]
+    pub default: bool,
+}
+
 // ── MCP-backed resources ────────────────────────────────────────────────────
 //
 // Issues, pull requests, and code search have no REST surface; they are served

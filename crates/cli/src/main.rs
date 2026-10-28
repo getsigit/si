@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod config;
 mod context;
+mod credential;
 mod git;
 mod mcp;
 mod ui;
@@ -45,9 +46,13 @@ async fn run() -> Result<()> {
         Command::Pr(command) => commands::pr::run(&ctx, command).await,
         Command::Issue(command) => commands::issue::run(&ctx, command).await,
         Command::Code(command) => commands::code::run(&ctx, command).await,
+        Command::Run(command) => commands::run::run(&ctx, command).await,
+        Command::Site(command) => commands::site::run(&ctx, command).await,
+        Command::Status(command) => commands::status::run(&ctx, command).await,
         Command::Hook(command) => commands::hook::run(&ctx, command).await,
         Command::Session(command) => commands::session::run(&ctx, command).await,
         Command::Billing(command) => commands::billing::run(&ctx, command).await,
+        Command::Models => commands::models::run(&ctx).await,
         Command::Browse(args) => commands::browse::run(&ctx, args).await,
         Command::Api(args) => commands::api::run(&ctx, args).await,
         // Takes `ctx` by value: the server outlives the dispatch, serving

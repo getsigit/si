@@ -35,6 +35,8 @@
 #[cfg(feature = "client")]
 pub mod account;
 #[cfg(feature = "client")]
+pub mod agent_runs;
+#[cfg(feature = "client")]
 pub mod billing;
 #[cfg(feature = "client")]
 pub mod client;
@@ -53,6 +55,10 @@ pub mod pulls;
 pub mod repos;
 #[cfg(feature = "client")]
 pub mod sessions;
+#[cfg(feature = "client")]
+pub mod sites;
+#[cfg(feature = "client")]
+pub mod statuses;
 
 /// Request header a client uses to name itself. [`client::ClientBuilder::client_name`]
 /// sends it on every request.
@@ -66,4 +72,5 @@ pub use {
     error::{ApiError, Result},
     issues::State,
     repos::NewRepository,
+    statuses::NewStatus,
 };

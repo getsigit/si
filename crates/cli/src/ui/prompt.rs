@@ -32,6 +32,15 @@ pub fn password(label: &str) -> Result<String> {
         .interact()?)
 }
 
+/// A new password, asked for twice.
+pub fn new_password(label: &str) -> Result<String> {
+    require_tty(label)?;
+    Ok(Password::with_theme(&ColorfulTheme::default())
+        .with_prompt(label)
+        .with_confirmation("Repeat the password", "The passwords do not match.")
+        .interact()?)
+}
+
 /// A yes/no confirmation. Non-interactive callers should not reach this at
 /// all for destructive actions — check `--yes` first — but reads default to
 /// `default` here rather than erroring, since a TTY-less "confirm the details
