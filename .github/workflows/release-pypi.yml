@@ -1,0 +1,247 @@
+name: Release PyPI
+
+# Publishes sigit-si-cli, the native `si` binary packaged as maturin wheels, on the same tag that
+# release-crates.yml publishes from.
+#
+# Windows arm64 wheels are intentionally not built here. GitHub's hosted Windows runners provide
+# x64 Python, and maturin refuses to build an arm64 wheel when the interpreter reports win-amd64.
+#
+# Auth is PyPI Trusted Publishing (OIDC), so no API token is stored. pypi.org needs a publisher
+# for this repository and workflow (release-pypi.yml), with no environment. For the first release
+# that is a pending publisher, which creates the project on first upload.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.3.0)"
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  PYPI_PACKAGE: sigit-si-cli
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - name: Tag matches the workspace version
+        shell: bash
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          workspace=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "$TAG" != "v$workspace" ]; then
+            echo "::error::tag $TAG does not match the workspace version $workspace"
+            exit 1
+          fi
+
+  build-wheels:
+    name: Build wheel (${{ matrix.build.NAME }})
+    needs: verify-version
+    runs-on: ${{ matrix.build.OS }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+          - {
+              NAME: linux-x64,
+              OS: ubuntu-22.04,
+              TARGET: x86_64-unknown-linux-gnu,
+              MANYLINUX: "2_28",
+            }
+          - {
+              NAME: linux-arm64,
+              OS: ubuntu-22.04-arm,
+              TARGET: aarch64-unknown-linux-gnu,
+              MANYLINUX: "2_28",
+            }
+          - {
+              NAME: windows-x64,
+              OS: windows-2022,
+              TARGET: x86_64-pc-windows-msvc,
+            }
+          - { NAME: darwin-x64, OS: macos-26, TARGET: x86_64-apple-darwin }
+          - { NAME: darwin-arm64, OS: macos-26, TARGET: aarch64-apple-darwin }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Read Rust toolchain
+        shell: bash
+        run: |
+          rust_toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml | head -n 1)"
+          if [ -z "$rust_toolchain" ]; then
+            echo "Failed to read Rust toolchain from rust-toolchain.toml" >&2
+            exit 1
+          fi
+          echo "RUST_TOOLCHAIN=${rust_toolchain}" >> "$GITHUB_ENV"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.build.TARGET }}
+
+      # The repo uses rustls and a vendored libgit2, so the manylinux container needs no extra
+      # system packages.
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.build.TARGET }}
+          manylinux: ${{ matrix.build.MANYLINUX || 'off' }}
+          working-directory: packaging/pypi/si
+          args: --release --locked --compatibility pypi --out dist
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-wheels-${{ matrix.build.NAME }}
+          path: packaging/pypi/si/dist/*
+
+  build-sdist:
+    name: Build source distribution
+    needs: verify-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          working-directory: packaging/pypi/si
+          args: --out dist
+
+      - name: Upload sdist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-sdist
+          path: packaging/pypi/si/dist/*
+
+  # Installing from the built wheels proves the binary loads, not just that it was packed: a
+  # missing runtime DLL or a glibc mismatch shows up here instead of on PyPI.
+  smoke-test:
+    name: Smoke test (${{ matrix.os }})
+    needs:
+      - build-wheels
+      - build-sdist
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          # The oldest image, so the Linux wheel runs against the glibc floor.
+          - ubuntu-22.04
+          - windows-2022
+          - macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set the release version
+        shell: bash
+        run: |
+          release_version="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "RELEASE_VERSION=${release_version#v}" >> "$GITHUB_ENV"
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pypi-*
+          path: dist
+          merge-multiple: true
+
+      # --only-binary keeps pip from falling back to the sdist, which would compile instead of
+      # testing the wheel.
+      - name: Install from the built wheels
+        shell: bash
+        run: |
+          python -m venv .venv
+          if [ -d .venv/Scripts ]; then bin_dir=.venv/Scripts; else bin_dir=.venv/bin; fi
+          "${bin_dir}/python" -m pip install --no-index --only-binary :all: --find-links dist "${PYPI_PACKAGE}==${RELEASE_VERSION}"
+          echo "SI_BIN_DIR=${bin_dir}" >> "$GITHUB_ENV"
+
+      - name: Run the installed binary
+        shell: bash
+        run: |
+          output="$("${SI_BIN_DIR}/si" --version)"
+          echo "${output}"
+          case "${output}" in
+            *"${RELEASE_VERSION}"*) ;;
+            *)
+              echo "::error::si --version did not report ${RELEASE_VERSION}" >&2
+              exit 1
+              ;;
+          esac
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: smoke-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Set the release version
+        shell: bash
+        run: |
+          release_version="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "RELEASE_VERSION=${release_version#v}" >> "$GITHUB_ENV"
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pypi-*
+          path: dist
+          merge-multiple: true
+
+      - name: Check whether release already exists on PyPI
+        id: pypi-check
+        shell: bash
+        run: |
+          # A 404 means the project or the version is not on PyPI, so publish. Anything other than
+          # 200 or 404 is an outage or a block, which must not read as "not published yet".
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --retry 3 --retry-delay 2 --retry-all-errors \
+            "https://pypi.org/pypi/${PYPI_PACKAGE}/${RELEASE_VERSION}/json")
+
+          case "$status" in
+            200)
+              echo "${PYPI_PACKAGE} ${RELEASE_VERSION} already exists on PyPI, skipping publish"
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unexpected ${status} from PyPI while checking whether ${PYPI_PACKAGE} ${RELEASE_VERSION} is published" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Publish distribution
+        if: steps.pypi-check.outputs.exists != 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
