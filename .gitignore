@@ -7,3 +7,10 @@
 
 # Secrets
 .env
+
+# NuGet (.NET tool)
+packaging/nuget/**/bin/
+packaging/nuget/**/obj/
+packaging/nuget/**/native/
+packaging/nuget/dist/
+packaging/nuget/NuGet.Config
