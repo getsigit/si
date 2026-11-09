@@ -222,7 +222,8 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          # The oldest image, so the smoke test runs the Linux binary against the glibc floor.
+          - ubuntu-22.04
           - windows-2022
           - macos-26
     steps:
@@ -290,10 +291,25 @@ jobs:
           } | Select-Object -First 1
 
           if (-not $nativeBinary) {
-            Write-Error "The si native binary for ${runtimeIdentifier} was not bundled in the installed .NET tool package."
+            throw "The si native binary for ${runtimeIdentifier} was not bundled in the installed .NET tool package."
           }
 
           Write-Host "Found bundled native binary at $($nativeBinary.FullName)"
+
+      # Finding the file proves it was packed, not that it loads. Running it catches a missing
+      # runtime DLL or a glibc mismatch before the package is published.
+      - name: Run the installed tool
+        shell: pwsh
+        run: |
+          $tool = if ($IsWindows) { ".tool/si.exe" } else { ".tool/si" }
+          $output = & $tool --version
+          if ($LASTEXITCODE -ne 0) {
+            throw "si --version exited with code $LASTEXITCODE"
+          }
+          Write-Host $output
+          if (($output -join " ") -notmatch [regex]::Escape($env:RELEASE_VERSION)) {
+            throw "si --version did not report $env:RELEASE_VERSION"
+          }
 
   publish-nuget:
     name: Publish to NuGet
