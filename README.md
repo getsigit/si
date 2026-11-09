@@ -10,7 +10,12 @@ drive Cloud Sessions, all from the terminal.
 cargo install --path crates/cli
 ```
 
-This installs a binary named `si`.
+This installs a binary named `si`. On a machine with the .NET SDK there is also
+a prebuilt tool:
+
+```sh
+dotnet tool install --global SiGit.Cli
+```
 
 ## Usage
 
