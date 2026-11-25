@@ -1,4 +1,4 @@
-name: Release GitHub
+name: CLI Release GitHub
 
 # Attaches the prebuilt `si` binaries, each with a .sha256 sidecar, to the GitHub release for the
 # tag, so Homebrew, Scoop or winget can be added later without rebuilding. Re-running overwrites

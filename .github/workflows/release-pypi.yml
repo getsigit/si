@@ -1,4 +1,4 @@
-name: Release PyPI
+name: CLI Release PyPI
 
 # Publishes sigit-si-cli, the native `si` binary packaged as maturin wheels, on the same tag that
 # release-crates.yml publishes from.

@@ -1,4 +1,4 @@
-name: Release npm
+name: CLI Release NPM
 
 # Publishes @getsigit/si, a launcher that resolves the native `si` binary from one of six
 # platform packages (@getsigit/si-<os>-<arch>), on the same tag that release-crates.yml
