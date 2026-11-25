@@ -36,6 +36,9 @@ download. `cargo install sigit-si-cli` builds only for your machine.
 ## Other installation methods
 
 - Cargo: `cargo install sigit-si-cli`
+- npm: `npm install -g @getsigit/si`
+- PyPI: `pipx install sigit-si-cli`
+- Prebuilt binaries: [GitHub Releases](https://github.com/getsigit/si/releases)
 
 ## Source
 

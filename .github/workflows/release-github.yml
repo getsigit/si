@@ -1,0 +1,169 @@
+name: Release GitHub
+
+# Attaches the prebuilt `si` binaries, each with a .sha256 sidecar, to the GitHub release for the
+# tag, so Homebrew, Scoop or winget can be added later without rebuilding. Re-running overwrites
+# the assets on the same release, so a re-pushed or re-dispatched tag is harmless.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.3.0)"
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - name: Tag matches the workspace version
+        shell: bash
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          workspace=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "$TAG" != "v$workspace" ]; then
+            echo "::error::tag $TAG does not match the workspace version $workspace"
+            exit 1
+          fi
+
+  build:
+    name: Build binary (${{ matrix.build.NAME }})
+    needs: verify-version
+    runs-on: ${{ matrix.build.OS }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+          - {
+              NAME: linux-x64,
+              OS: ubuntu-22.04,
+              TARGET: x86_64-unknown-linux-gnu,
+            }
+          - {
+              NAME: linux-arm64,
+              OS: ubuntu-22.04-arm,
+              TARGET: aarch64-unknown-linux-gnu,
+            }
+          - {
+              NAME: windows-x64,
+              OS: windows-2022,
+              TARGET: x86_64-pc-windows-msvc,
+            }
+          - {
+              NAME: windows-arm64,
+              OS: windows-2022,
+              TARGET: aarch64-pc-windows-msvc,
+            }
+          - { NAME: darwin-x64, OS: macos-26, TARGET: x86_64-apple-darwin }
+          - { NAME: darwin-arm64, OS: macos-26, TARGET: aarch64-apple-darwin }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Read Rust toolchain
+        shell: bash
+        run: |
+          rust_toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml | head -n 1)"
+          if [ -z "$rust_toolchain" ]; then
+            echo "Failed to read Rust toolchain from rust-toolchain.toml" >&2
+            exit 1
+          fi
+          echo "RUST_TOOLCHAIN=${rust_toolchain}" >> "$GITHUB_ENV"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install Rust target
+        shell: bash
+        run: |
+          rustup target add ${{ matrix.build.TARGET }} --toolchain ${{ env.RUST_TOOLCHAIN }}
+          rustup target list --installed
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: github-${{ matrix.build.TARGET }}
+
+      # Linux builds on the oldest runner image for its glibc floor (2.35). The repo uses rustls,
+      # so there is no OpenSSL to link or vendor.
+      - name: Build binary
+        shell: bash
+        run: cargo build --locked --release -p sigit-si-cli --bin si --target ${{ matrix.build.TARGET }}
+
+      # The exe must not import the VC++ runtime DLLs (see .cargo/config.toml), or it fails to
+      # load on a machine without the redistributable.
+      - name: Check static CRT
+        if: contains(matrix.build.TARGET, 'windows')
+        shell: pwsh
+        run: ./packaging/windows/check-static-crt.ps1 -Path target/${{ matrix.build.TARGET }}/release/si.exe
+
+      # Windows runners use bash from Git for Windows, which has sha256sum; macOS only has shasum.
+      - name: Package binary and checksum
+        shell: bash
+        env:
+          BUILD_NAME: ${{ matrix.build.NAME }}
+          TARGET: ${{ matrix.build.TARGET }}
+        run: |
+          suffix=""
+          if [[ "${BUILD_NAME}" == windows-* ]]; then
+            suffix=".exe"
+          fi
+
+          mkdir -p release
+          asset="si-${BUILD_NAME}${suffix}"
+          cp "target/${TARGET}/release/si${suffix}" "release/${asset}"
+
+          cd release
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${asset}" | awk '{print $1}' > "${asset}.sha256"
+          else
+            shasum -a 256 "${asset}" | awk '{print $1}' > "${asset}.sha256"
+          fi
+          echo "${asset}: $(cat "${asset}.sha256")"
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-binary-${{ matrix.build.NAME }}
+          path: release/*
+
+  release:
+    name: Create GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: github-binary-*
+          path: release
+          merge-multiple: true
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: release/*
+          generate_release_notes: true

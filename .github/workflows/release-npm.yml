@@ -1,0 +1,280 @@
+name: Release npm
+
+# Publishes @getsigit/si, a launcher that resolves the native `si` binary from one of six
+# platform packages (@getsigit/si-<os>-<arch>), on the same tag that release-crates.yml
+# publishes from.
+#
+# Auth is npm Trusted Publishing (OIDC), so no token is stored. Each of the seven packages needs
+# a trusted publisher for this repository and workflow (release-npm.yml). `npm trust` only works
+# on a package that already exists, so the first version of each is published by hand.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.3.0)"
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The binary reports CARGO_PKG_VERSION, and the launcher package.json carries its own copy of
+  # the version, so both must agree with the tag.
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - name: Tag matches the workspace and npm package versions
+        shell: bash
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          workspace=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "$TAG" != "v$workspace" ]; then
+            echo "::error::tag $TAG does not match the workspace version $workspace"
+            exit 1
+          fi
+
+          npm_version=$(node -p "require('./packaging/npm/si/package.json').version")
+          if [ "$TAG" != "v$npm_version" ]; then
+            echo "::error::tag $TAG does not match packaging/npm/si/package.json version $npm_version. Bump it (and its lockfile) with the workspace version."
+            exit 1
+          fi
+
+  publish-npm-binaries:
+    name: Publish @getsigit/si-${{ matrix.build.NAME }}
+    needs: verify-version
+    runs-on: ${{ matrix.build.OS }}
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+          - {
+              NAME: linux-x64,
+              OS: ubuntu-22.04,
+              TARGET: x86_64-unknown-linux-gnu,
+              NODE_OS: linux,
+              NODE_ARCH: x64,
+            }
+          - {
+              NAME: linux-arm64,
+              OS: ubuntu-22.04-arm,
+              TARGET: aarch64-unknown-linux-gnu,
+              NODE_OS: linux,
+              NODE_ARCH: arm64,
+            }
+          - {
+              NAME: windows-x64,
+              OS: windows-2022,
+              TARGET: x86_64-pc-windows-msvc,
+              NODE_OS: win32,
+              NODE_ARCH: x64,
+            }
+          - {
+              NAME: windows-arm64,
+              OS: windows-2022,
+              TARGET: aarch64-pc-windows-msvc,
+              NODE_OS: win32,
+              NODE_ARCH: arm64,
+            }
+          - {
+              NAME: darwin-x64,
+              OS: macos-26,
+              TARGET: x86_64-apple-darwin,
+              NODE_OS: darwin,
+              NODE_ARCH: x64,
+            }
+          - {
+              NAME: darwin-arm64,
+              OS: macos-26,
+              TARGET: aarch64-apple-darwin,
+              NODE_OS: darwin,
+              NODE_ARCH: arm64,
+            }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set the release version
+        shell: bash
+        run: |
+          release_version="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "RELEASE_VERSION=${release_version#v}" >> "$GITHUB_ENV"
+
+      - name: Read Rust toolchain
+        shell: bash
+        run: |
+          rust_toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml | head -n 1)"
+          if [ -z "$rust_toolchain" ]; then
+            echo "Failed to read Rust toolchain from rust-toolchain.toml" >&2
+            exit 1
+          fi
+          echo "RUST_TOOLCHAIN=${rust_toolchain}" >> "$GITHUB_ENV"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install Rust target
+        shell: bash
+        run: |
+          rustup target add ${{ matrix.build.TARGET }} --toolchain ${{ env.RUST_TOOLCHAIN }}
+          rustup target list --installed
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: npm-${{ matrix.build.TARGET }}
+
+      # Linux builds on the oldest runner image for its glibc floor (2.35). The repo uses rustls,
+      # so there is no OpenSSL to link or vendor.
+      - name: Build binary
+        shell: bash
+        run: cargo build --locked --release -p sigit-si-cli --bin si --target ${{ matrix.build.TARGET }}
+
+      # The exe must not import the VC++ runtime DLLs (see .cargo/config.toml), or it fails to
+      # load on a machine without the redistributable.
+      - name: Check static CRT
+        if: contains(matrix.build.TARGET, 'windows')
+        shell: pwsh
+        run: ./packaging/windows/check-static-crt.ps1 -Path target/${{ matrix.build.TARGET }}/release/si.exe
+
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Render the platform package
+        shell: bash
+        env:
+          BUILD_NAME: ${{ matrix.build.NAME }}
+          TARGET: ${{ matrix.build.TARGET }}
+          NODE_OS: ${{ matrix.build.NODE_OS }}
+          NODE_ARCH: ${{ matrix.build.NODE_ARCH }}
+        run: |
+          package_directory="si-${BUILD_NAME}"
+          executable_name="si"
+          if [[ "${BUILD_NAME}" == windows-* ]]; then
+            executable_name="si.exe"
+          fi
+
+          mkdir -p "packaging/npm/${package_directory}/bin"
+          node packaging/npm/scripts/render-platform-package.cjs \
+            "${package_directory}" "${RELEASE_VERSION}" "${NODE_OS}" "${NODE_ARCH}"
+          cp "target/${TARGET}/release/${executable_name}" "packaging/npm/${package_directory}/bin/"
+
+      - name: Check whether the package version already exists on npm
+        id: npm-check
+        shell: bash
+        env:
+          BUILD_NAME: ${{ matrix.build.NAME }}
+        run: |
+          # A 404 means this version is not on npm yet. Anything other than 200 or 404 is an
+          # outage or a block, which must not read as "not published yet".
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --retry 3 --retry-delay 2 --retry-all-errors \
+            "https://registry.npmjs.org/@getsigit%2Fsi-${BUILD_NAME}/${RELEASE_VERSION}")
+
+          case "$status" in
+            200)
+              echo "@getsigit/si-${BUILD_NAME}@${RELEASE_VERSION} already exists on npm, skipping publish"
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unexpected ${status} from npm while checking @getsigit/si-${BUILD_NAME}@${RELEASE_VERSION}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Publish to npm
+        if: steps.npm-check.outputs.exists != 'true'
+        shell: bash
+        env:
+          BUILD_NAME: ${{ matrix.build.NAME }}
+        run: |
+          cd "packaging/npm/si-${BUILD_NAME}"
+          npm publish --access public --provenance
+
+  publish-npm-base:
+    name: Publish @getsigit/si
+    needs: publish-npm-binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set the release version
+        shell: bash
+        run: |
+          release_version="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "RELEASE_VERSION=${release_version#v}" >> "$GITHUB_ENV"
+
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Render and build the launcher
+        shell: bash
+        working-directory: packaging/npm/si
+        run: |
+          node ../scripts/render-main-package.cjs ./package.json "${RELEASE_VERSION}"
+          npm ci
+          npm run build
+
+      - name: Check whether the package version already exists on npm
+        id: npm-check
+        shell: bash
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --retry 3 --retry-delay 2 --retry-all-errors \
+            "https://registry.npmjs.org/@getsigit%2Fsi/${RELEASE_VERSION}")
+
+          case "$status" in
+            200)
+              echo "@getsigit/si@${RELEASE_VERSION} already exists on npm, skipping publish"
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unexpected ${status} from npm while checking @getsigit/si@${RELEASE_VERSION}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Publish to npm
+        if: steps.npm-check.outputs.exists != 'true'
+        shell: bash
+        working-directory: packaging/npm/si
+        run: npm publish --access public --provenance

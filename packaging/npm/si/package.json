@@ -1,0 +1,44 @@
+{
+  "name": "@getsigit/si",
+  "version": "1.3.1",
+  "mcpName": "si.sigit/cli",
+  "keywords": [
+    "sigit",
+    "si",
+    "cli",
+    "git",
+    "code-review",
+    "mcp"
+  ],
+  "bin": {
+    "si": "lib/index.js"
+  },
+  "files": [
+    "lib",
+    "README.md"
+  ],
+  "description": "si, the sigit.si command line interface.",
+  "license": "Apache-2.0",
+  "homepage": "https://sigit.si",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/getsigit/si.git"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "dev": "npm run build && node lib/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^18.15.11",
+    "typescript": "^5.0.0"
+  },
+  "optionalDependencies": {
+    "@getsigit/si-darwin-arm64": "1.3.1",
+    "@getsigit/si-darwin-x64": "1.3.1",
+    "@getsigit/si-linux-arm64": "1.3.1",
+    "@getsigit/si-linux-x64": "1.3.1",
+    "@getsigit/si-windows-arm64": "1.3.1",
+    "@getsigit/si-windows-x64": "1.3.1"
+  }
+}
