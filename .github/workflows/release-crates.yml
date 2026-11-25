@@ -94,6 +94,19 @@ jobs:
             exit 1
           fi
 
+      # The Claude plugin directory publishes an update only when plugin.json's
+      # version rises, so it moves with the crates.
+      - name: Check the Claude plugin version matches the tag
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          plugin=$(jq -r .version packaging/claude-plugin/.claude-plugin/plugin.json)
+          if [ "$plugin" != "$VERSION" ]; then
+            echo "::error::packaging/claude-plugin is at ${plugin}, but the tag is v${VERSION}"
+            exit 1
+          fi
+
       - name: Test
         run: cargo test --workspace --locked
 

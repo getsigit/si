@@ -121,6 +121,17 @@ they're served over the same MCP (Model Context Protocol) JSON-RPC endpoint
 the AI agent uses. `sigit-si-api` speaks that transport internally; it's not
 visible at the call site.
 
+## Claude plugin
+
+`packaging/claude-plugin` is the siGit plugin for the Claude plugin directory. It bundles the
+hosted server at `https://sigit.si/api/v1/mcp`, not `si mcp`, so it works in claude.ai and
+Cowork as well as Claude Code, and users sign in through the browser with sigit.si's OAuth
+server. The directory tracks `main` and reads that folder, and it publishes an update only
+when `version` in `.claude-plugin/plugin.json` rises, so that version moves with the crates
+(`release-crates.yml` fails if it doesn't match the tag). Its README is the listing text and
+goes through the directory's policy review, so it must not tell people to install or add any
+other MCP server.
+
 ## MCP Registry listings
 
 This repo publishes two entries to the
@@ -149,7 +160,8 @@ setup and release runbook live with the server (private `sigit-si` repo).
 To cut a release, bump `[workspace.package].version` and the `sigit-si-api`
 dependency in the root `Cargo.toml`, and the `version` in
 `packaging/npm/si/package.json` and its lockfile (`release-npm.yml` fails when
-it differs from the tag; PyPI and NuGet read the version from the crate), merge `development` into `main`, and push a
+it differs from the tag; PyPI and NuGet read the version from the crate), and
+`version` in `packaging/claude-plugin/.claude-plugin/plugin.json`, merge `development` into `main`, and push a
 `vX.Y.Z` tag. `release-crates.yml` checks the crate versions against the tag,
 publishes whichever of `sigit-si-api` and `sigit-si-cli` isn't on crates.io yet
 (through Trusted Publishing, so no token is stored), then dispatches
