@@ -1,6 +1,6 @@
 {
   "name": "sigitsi",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Work with your siGit (sigit.si) repositories from Claude: browse and search code, read and open issues and pull requests, comment, and search the web.",
   "author": {
     "name": "siGit Si",
