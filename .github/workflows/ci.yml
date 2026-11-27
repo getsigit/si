@@ -36,3 +36,45 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+  # Packaging breakage should show up on the pull request, not on the tag.
+  npm-launcher:
+    name: npm launcher typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Build the launcher
+        working-directory: packaging/npm/si
+        run: |
+          npm ci
+          npm run build
+
+  pypi-wheel:
+    name: PyPI wheel build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Rust toolchain
+        shell: bash
+        run: |
+          rust_toolchain="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml | head -n 1)"
+          echo "RUST_TOOLCHAIN=${rust_toolchain}" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          manylinux: "off"
+          working-directory: packaging/pypi/si
+          args: --release --locked --out dist

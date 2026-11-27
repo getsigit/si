@@ -1,4 +1,4 @@
-name: Release NuGet
+name: CLI Release NuGet
 
 # Publishes SiGit.Cli, a .NET tool that bundles the native `si` binaries, on the same tag that
 # release-crates.yml publishes from.

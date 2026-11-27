@@ -1,0 +1,16 @@
+{
+  "name": "sigit",
+  "version": "1.4.0",
+  "description": "Work with your siGit (sigit.si) repositories from Claude: browse and search code, read and open issues and pull requests, comment, and search the web.",
+  "author": {
+    "name": "siGit",
+    "email": "privacy@sigit.si",
+    "url": "https://sigit.si"
+  },
+  "homepage": "https://sigit.si",
+  "repository": "https://github.com/getsigit/si",
+  "license": "Apache-2.0",
+  "keywords": ["git", "git hosting", "code search", "pull requests", "issues", "sigit"],
+  "privacyPolicyUrl": "https://sigit.si/privacy",
+  "icon": ".claude-plugin/icon.png"
+}
