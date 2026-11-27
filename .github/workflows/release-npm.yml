@@ -243,13 +243,18 @@ jobs:
           node-version-file: .nvmrc
           registry-url: "https://registry.npmjs.org"
 
-      - name: Render and build the launcher
+      # Build first, then render. The committed package.json and lockfile leave out the six
+      # platform packages, because a lockfile can't pin a version that hasn't been published:
+      # it would hold the previous release's version and `npm ci` would refuse it. The build
+      # only needs TypeScript. The render then adds the platform packages at this release's
+      # version, just before `npm publish`.
+      - name: Build and render the launcher
         shell: bash
         working-directory: packaging/npm/si
         run: |
-          node ../scripts/render-main-package.cjs ./package.json "${RELEASE_VERSION}"
           npm ci
           npm run build
+          node ../scripts/render-main-package.cjs ./package.json "${RELEASE_VERSION}"
 
       - name: Check whether the package version already exists on npm
         id: npm-check

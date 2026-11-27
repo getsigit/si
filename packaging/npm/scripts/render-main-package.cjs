@@ -10,7 +10,8 @@ if (!outputPath || !version) {
 }
 
 // The platform binary packages the launcher resolves at runtime. Kept in lockstep with the
-// release-npm.yml build matrix.
+// release-npm.yml build matrix. They are only added here, at publish time, and never to the
+// committed package.json or its lockfile (see the "Build and render the launcher" step).
 const platformSuffixes = [
     "darwin-arm64",
     "darwin-x64",
