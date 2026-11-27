@@ -1,6 +1,6 @@
 {
   "name": "@getsigit/si",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "mcpName": "si.sigit/cli",
   "keywords": [
     "sigit",
@@ -34,11 +34,11 @@
     "typescript": "^5.0.0"
   },
   "optionalDependencies": {
-    "@getsigit/si-darwin-arm64": "1.3.1",
-    "@getsigit/si-darwin-x64": "1.3.1",
-    "@getsigit/si-linux-arm64": "1.3.1",
-    "@getsigit/si-linux-x64": "1.3.1",
-    "@getsigit/si-windows-arm64": "1.3.1",
-    "@getsigit/si-windows-x64": "1.3.1"
+    "@getsigit/si-darwin-arm64": "1.4.0",
+    "@getsigit/si-darwin-x64": "1.4.0",
+    "@getsigit/si-linux-arm64": "1.4.0",
+    "@getsigit/si-linux-x64": "1.4.0",
+    "@getsigit/si-windows-arm64": "1.4.0",
+    "@getsigit/si-windows-x64": "1.4.0"
   }
 }
